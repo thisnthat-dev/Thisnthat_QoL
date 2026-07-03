@@ -76,40 +76,47 @@ function addon.MythicPlusHelper.BuildRewardString()
 end
 
 
+local MediaType_BORDER     = LSM.MediaType.BORDER
+local MediaType_FONT       = LSM.MediaType.FONT
+local MediaType_STATUSBAR = LSM.MediaType.STATUSBAR
+
 function addon.MythicPlusHelper.initialize()
-    local parentFrame = PVEFrame
+   local parentFrame = PVEFrame
 
-    addon.MythicPlusHelper.frame = CreateFrame("Frame", "MPRFrame", parentFrame, "BackdropTemplate")
-    addon.MythicPlusHelper.frame:SetBackdrop({
-    bgFile = "Interface\\Addons\\SharedMedia_Naowh\\statusbar\\Armory",
-        edgeFile = "Interface\\Addons\\SharedMedia_Naowh\\border\\Naowh2",
-        edgeSize = 12,
-        insets = { left = 1, right = 1, top = 1, bottom = 1 },
-    })
-    addon.MythicPlusHelper.frame:SetBackdropColor(0.12, 0.12, 0.12, 0.9)
-    addon.MythicPlusHelper.frame:SetBackdropBorderColor(0.18,0.18,0.18, 1)
-    addon.MythicPlusHelper.frame:Show()
-    addon.MythicPlusHelper.frame:SetPoint("BOTTOMLEFT", parentFrame, "BOTTOMRIGHT", 0, -1)
+   local frameBG = LSM:Fetch(MediaType_STATUSBAR, "Thisnthat")
+   local frameEdge = LSM:Fetch(MediaType_BORDER, "thisnthat_2px")
+   addon.MythicPlusHelper.frame = CreateFrame("Frame", "MPRFrame", parentFrame, "BackdropTemplate")
+   addon.MythicPlusHelper.frame:SetBackdrop({
+      bgFile = frameBG,
+      edgeFile = frameEdge,
+      edgeSize = 12,
+      insets = { left = 1, right = 1, top = 1, bottom = 1 },
+   })
 
-    local font = LSM:Fetch(LSM.MediaType.FONT, "Fira") or "2002"
-    addon.MythicPlusHelper.frameTitle = addon.MythicPlusHelper.frame:CreateFontString(font, "OVERLAY", "GameFontNormalLarge")
-    addon.MythicPlusHelper.frameTitle:SetJustifyH("LEFT")
-    addon.MythicPlusHelper.frameTitle:SetTextColor(0.95, 0.95, 0.95, 1)
-    addon.MythicPlusHelper.frameTitle:SetPoint("TOPLEFT", 6, -8)
-    addon.MythicPlusHelper.frameTitle:SetFontHeight(12)
-    addon.MythicPlusHelper.frameTitle:SetFont(font, 12)
+   addon.MythicPlusHelper.frame:SetBackdropColor(0.12, 0.12, 0.12, 0.9)
+   addon.MythicPlusHelper.frame:SetBackdropBorderColor(0.18,0.18,0.18, 1)
+   addon.MythicPlusHelper.frame:Show()
+   addon.MythicPlusHelper.frame:SetPoint("BOTTOMLEFT", parentFrame, "BOTTOMRIGHT", 0, -1)
 
-    local minFrameSize = max(addon.MythicPlusHelper.frameTitle:GetStringWidth() + 12, 100)
-    local minFrameHeight = max(addon.MythicPlusHelper.frameTitle:GetStringHeight() + 16, 100)
-    addon.MythicPlusHelper.frame:SetSize(minFrameSize, minFrameHeight)
+   local font = LSM:Fetch(LSM.MediaType.FONT, "Fira") or "2002"
+   addon.MythicPlusHelper.frameTitle = addon.MythicPlusHelper.frame:CreateFontString(font, "OVERLAY", "GameFontNormalLarge")
+   addon.MythicPlusHelper.frameTitle:SetJustifyH("LEFT")
+   addon.MythicPlusHelper.frameTitle:SetTextColor(0.95, 0.95, 0.95, 1)
+   addon.MythicPlusHelper.frameTitle:SetPoint("TOPLEFT", 6, -8)
+   addon.MythicPlusHelper.frameTitle:SetFontHeight(12)
+   addon.MythicPlusHelper.frameTitle:SetFont(font, 12)
 
-    addon.MythicPlusHelper.frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+   local minFrameSize = max(addon.MythicPlusHelper.frameTitle:GetStringWidth() + 12, 100)
+   local minFrameHeight = max(addon.MythicPlusHelper.frameTitle:GetStringHeight() + 16, 100)    
+   addon.MythicPlusHelper.frame:SetSize(minFrameSize, minFrameHeight)
 
-    addon.MythicPlusHelper.frame:SetScript("OnEvent", function(self, event, unit, _, eventSpellID)
-        if event == "PLAYER_ENTERING_WORLD" then
-            addon.MythicPlusHelper.UpdateFrameText()
-        end
-    end)
+   addon.MythicPlusHelper.frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+
+   addon.MythicPlusHelper.frame:SetScript("OnEvent", function(self, event, unit, _, eventSpellID)
+      if event == "PLAYER_ENTERING_WORLD" then
+         addon.MythicPlusHelper.UpdateFrameText()
+      end
+   end)
 end
 
 function addon.MythicPlusHelper.UpdateFrameText()
