@@ -378,6 +378,19 @@ local function GetCurrentLoadoutName()
     return GetTalentLoadoutNameFromBlizzardAPI() or "Unknown"
 end
 
+local function GetSpecializationBrokerConfig()
+    local databrokers = addonRef and addonRef.db and addonRef.db.databrokers
+    local config = databrokers and databrokers.specializationBroker
+    if type(config) ~= "table" then
+        return {
+            enabled = true,
+            hideLootIconWhenSame = true,
+        }
+    end
+
+    return config
+end
+
 local function TrySetSpecialization(specIndex, specID)
     if type(specIndex) ~= "number" then
         return false
@@ -626,6 +639,7 @@ local function ShowFallbackMenu(title, entries)
 end
 
 local function GetDisplayInfo()
+    local config = GetSpecializationBrokerConfig()
     local specIndex = GetCurrentSpecializationIndex()
     local specInfo = specIndex and GetSpecializationInfoByIndex(specIndex) or nil
 
@@ -639,9 +653,12 @@ local function GetDisplayInfo()
 
     local lootIcon
     local getSpecializationInfoByID = rawget(_G, "GetSpecializationInfoByID")
-    if effectiveLootSpecID and effectiveLootSpecID ~= talentSpecID and type(getSpecializationInfoByID) == "function" then
-        local _, _, _, iconTexture = getSpecializationInfoByID(effectiveLootSpecID)
-        lootIcon = iconTexture
+    local hideLootIconWhenSame = config.hideLootIconWhenSame ~= false
+    if effectiveLootSpecID and type(getSpecializationInfoByID) == "function" then
+        if effectiveLootSpecID ~= talentSpecID or not hideLootIconWhenSame then
+            local _, _, _, iconTexture = getSpecializationInfoByID(effectiveLootSpecID)
+            lootIcon = iconTexture
+        end
     end
 
     local loadoutName = GetCurrentLoadoutName()
@@ -667,6 +684,16 @@ end
 
 local function RefreshDataObject()
     if not dataObject then
+        return
+    end
+
+    local config = GetSpecializationBrokerConfig()
+    if config.enabled == false then
+        dataObject.text = ""
+        dataObject.icon = nil
+        if moduleRef and type(moduleRef.RefreshBars) == "function" then
+            moduleRef:RefreshBars()
+        end
         return
     end
 
@@ -826,6 +853,11 @@ local function InitializeBroker(addon, module, ldb)
         text = "",
         icon = nil,
         OnClick = function(_, mouseButton)
+            local config = GetSpecializationBrokerConfig()
+            if config.enabled == false then
+                return
+            end
+
             if IsRightMouseButton(mouseButton) then
                 ShowLootSpecializationMenu()
             else
@@ -833,6 +865,11 @@ local function InitializeBroker(addon, module, ldb)
             end
         end,
         OnTooltipShow = function(tooltip)
+            local config = GetSpecializationBrokerConfig()
+            if config.enabled == false then
+                return
+            end
+
             if not tooltip then
                 return
             end
@@ -860,6 +897,10 @@ local function InitializeBroker(addon, module, ldb)
 
     RegisterEvents()
     RefreshDataObject()
+
+    if moduleRef and type(moduleRef.RegisterCustomBrokerRefresher) == "function" then
+        moduleRef:RegisterCustomBrokerRefresher(RefreshDataObject)
+    end
 
     return brokerName
 end

@@ -89,7 +89,13 @@ end
 local function GetSystemBrokerConfig()
     local databrokers = addonRef and addonRef.db and addonRef.db.databrokers
     local config = databrokers and databrokers.systemBroker
-    return type(config) == "table" and config or nil
+    if type(config) ~= "table" then
+        return {
+            enabled = true,
+        }
+    end
+
+    return config
 end
 
 local function GetSystemColorPalette(paletteName)
@@ -192,6 +198,16 @@ local function RefreshDataObject()
         return
     end
 
+    local config = GetSystemBrokerConfig()
+    if config.enabled == false then
+        dataObject.text = ""
+        dataObject.icon = nil
+        if moduleRef and type(moduleRef.RefreshBars) == "function" then
+            moduleRef:RefreshBars()
+        end
+        return
+    end
+
     dataObject.text = BuildText()
     dataObject.icon = nil
 
@@ -253,6 +269,10 @@ local function InitializeBroker(addon, module, ldb)
 
     EnsureRefreshFrame()
     RefreshDataObject()
+
+    if moduleRef and type(moduleRef.RegisterCustomBrokerRefresher) == "function" then
+        moduleRef:RegisterCustomBrokerRefresher(RefreshDataObject)
+    end
 
     return brokerName
 end

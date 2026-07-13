@@ -2,6 +2,7 @@ local ADDON_NAME, ns = ...
 
 local Addon = CreateFrame("Frame")
 ns.Addon = Addon
+_G.Thisnthat_Databrokers_Addon = Addon
 
 Addon.modules = {}
 Addon.initialized = false
@@ -15,8 +16,50 @@ local defaults = {
     },
     databrokers = {
         clockBroker = {
+            enabled = true,
             useServerTime = false,
             use24Hour = false,
+        },
+        durabilityColors = {
+            enabled = true,
+            ok = {
+                r = 0,
+                g = 1,
+                b = 0,
+                a = 1,
+            },
+            warning = {
+                r = 1,
+                g = 1,
+                b = 0,
+                a = 1,
+            },
+            critical = {
+                r = 1,
+                g = 0,
+                b = 0,
+                a = 1,
+            },
+        },
+        systemBroker = {
+            enabled = true,
+            fpsColors = {
+                critical = { r = 1, g = 0, b = 0, a = 1 },
+                warning = { r = 1, g = 1, b = 0, a = 1 },
+                ok = { r = 0, g = 1, b = 0, a = 1 },
+            },
+            latencyColors = {
+                critical = { r = 1, g = 0, b = 0, a = 1 },
+                warning = { r = 1, g = 1, b = 0, a = 1 },
+                ok = { r = 0, g = 1, b = 0, a = 1 },
+            },
+        },
+        specializationBroker = {
+            enabled = true,
+            hideLootIconWhenSame = true,
+        },
+        options = {
+            selectedBrokerKey = "clockBroker",
         },
     },
     globalMedia = {

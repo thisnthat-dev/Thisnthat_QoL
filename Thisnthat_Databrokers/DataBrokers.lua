@@ -8,6 +8,7 @@ end
 local Module = {
     customBrokerNames = {},
     customBrokerInitializers = {},
+    customBrokerRefreshers = {},
     initialized = false,
 }
 
@@ -61,6 +62,23 @@ function Module:RegisterCustomBroker(initializer)
             AddCustomBrokerName(brokerName)
         else
             Addon:Print("Failed to initialize custom DataBroker: " .. tostring(brokerName))
+        end
+    end
+end
+
+function Module:RegisterCustomBrokerRefresher(refresher)
+    if type(refresher) ~= "function" then
+        return
+    end
+
+    self.customBrokerRefreshers[#self.customBrokerRefreshers + 1] = refresher
+end
+
+function Module:RefreshCustomBrokers()
+    for _, refresher in ipairs(self.customBrokerRefreshers) do
+        local ok, err = pcall(refresher)
+        if not ok then
+            Addon:Print("Failed to refresh custom DataBroker: " .. tostring(err))
         end
     end
 end

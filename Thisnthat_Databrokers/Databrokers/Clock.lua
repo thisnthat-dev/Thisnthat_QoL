@@ -17,12 +17,14 @@ local function GetClockConfig()
     local cfg = databrokers and databrokers.clockBroker
     if type(cfg) ~= "table" then
         return {
+            enabled = true,
             useServerTime = false,
             use24Hour = false,
         }
     end
 
     return {
+        enabled = cfg.enabled ~= false,
         useServerTime = cfg.useServerTime and true or false,
         use24Hour = cfg.use24Hour and true or false,
     }
@@ -174,6 +176,16 @@ local function RefreshDataObject()
         return
     end
 
+    local cfg = GetClockConfig()
+    if cfg.enabled == false then
+        dataObject.text = ""
+        dataObject.icon = nil
+        if moduleRef and type(moduleRef.RefreshBars) == "function" then
+            moduleRef:RefreshBars()
+        end
+        return
+    end
+
     dataObject.text = BuildText()
     dataObject.icon = nil
 
@@ -293,6 +305,10 @@ local function InitializeBroker(addon, module, ldb)
     EnsureEventFrame()
     RequestPlayedTime()
     RefreshDataObject()
+
+    if moduleRef and type(moduleRef.RegisterCustomBrokerRefresher) == "function" then
+        moduleRef:RegisterCustomBrokerRefresher(RefreshDataObject)
+    end
 
     return brokerName
 end
