@@ -6,6 +6,10 @@ local addonRef = nil
 local moduleRef = nil
 local eventFrame = nil
 
+local ToggleCharacter = ToggleCharacter
+local CharacterFrame = CharacterFrame
+local ShowUIPanel = ShowUIPanel
+
 local function ResolveBrokerLabel(noLabel, customLabel, fallback)
     if noLabel then
         return ""
@@ -35,13 +39,8 @@ local EQUIPPED_SLOTS = {
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
 }
 
-local function GetInventoryItemLinkFunction()
-    return rawget(_G, "GetInventoryItemLink")
-end
-
-local function GetInventoryItemDurabilityFunction()
-    return rawget(_G, "GetInventoryItemDurability")
-end
+local GetInventoryItemLink = GetInventoryItemLink
+local GetInventoryItemDurability = GetInventoryItemDurability
 
 local function ColorText(text, red, green, blue)
     return string.format("|cff%02x%02x%02x%s|r", math.floor((red or 1) * 255), math.floor((green or 1) * 255), math.floor((blue or 1) * 255), tostring(text))
@@ -93,12 +92,11 @@ local function GetDurabilityColor(percent)
 end
 
 local function GetSlotItemLink(slotID)
-    local getInventoryItemLink = GetInventoryItemLinkFunction()
-    if type(getInventoryItemLink) ~= "function" then
+    if type(GetInventoryItemLink) ~= "function" then
         return nil
     end
 
-    local ok, link = pcall(getInventoryItemLink, "player", slotID)
+    local ok, link = pcall(GetInventoryItemLink, "player", slotID)
     if ok and type(link) == "string" and link ~= "" then
         return link
     end
@@ -107,12 +105,11 @@ local function GetSlotItemLink(slotID)
 end
 
 local function GetSlotDurability(slotID)
-    local getInventoryItemDurability = GetInventoryItemDurabilityFunction()
-    if type(getInventoryItemDurability) ~= "function" then
+    if type(GetInventoryItemDurability) ~= "function" then
         return nil, nil
     end
 
-    local ok, current, maximum = pcall(getInventoryItemDurability, slotID)
+    local ok, current, maximum = pcall(GetInventoryItemDurability, slotID)
     if not ok or type(current) ~= "number" or type(maximum) ~= "number" or maximum <= 0 then
         return nil, nil
     end
@@ -212,23 +209,14 @@ local function BuildTooltip(tooltip)
     end
 end
 
-local function OpenCharacterWindow()
-    local toggleCharacter = rawget(_G, "ToggleCharacter")
-    if type(toggleCharacter) == "function" then
-        pcall(toggleCharacter, "PaperDollFrame")
+local function OpenCharacterWindow()    
+    if type(ToggleCharacter) == "function" then
+        pcall(ToggleCharacter, "PaperDollFrame")
         return
     end
 
-    local togglePaperDollInfo = rawget(_G, "TogglePaperDollInfo")
-    if type(togglePaperDollInfo) == "function" then
-        pcall(togglePaperDollInfo)
-        return
-    end
-
-    local characterFrame = rawget(_G, "CharacterFrame")
-    local showUIPanel = rawget(_G, "ShowUIPanel")
-    if characterFrame and type(showUIPanel) == "function" then
-        pcall(showUIPanel, characterFrame)
+    if CharacterFrame and type(ShowUIPanel) == "function" then
+        pcall(ShowUIPanel, CharacterFrame)
     end
 end
 
@@ -279,23 +267,14 @@ local function InitializeBroker(addon, module, ldb)
     EnsureEventFrame()
     RefreshDataObject()
 
-    if moduleRef and type(moduleRef.RegisterCustomBrokerRefresher) == "function" then
-        moduleRef:RegisterCustomBrokerRefresher(RefreshDataObject)
+    if moduleRef and type(moduleRef.RegisterBrokerRefresher) == "function" then
+        moduleRef:RegisterBrokerRefresher(RefreshDataObject)
     end
 
     return brokerName
 end
 
-local function GetDatabrokersModule()
-    local hostAddon = type(ns) == "table" and ns.Addon
-    if hostAddon and type(hostAddon.GetModule) == "function" then
-        return hostAddon:GetModule("databrokers")
-    end
-
-    return nil
-end
-
-local databrokersModule = GetDatabrokersModule()
-if databrokersModule and type(databrokersModule.RegisterCustomBroker) == "function" then
-    databrokersModule:RegisterCustomBroker(InitializeBroker)
+local databrokersRegistry = type(ns) == "table" and ns.DataBrokers or nil
+if databrokersRegistry and type(databrokersRegistry.RegisterBroker) == "function" then
+    databrokersRegistry:RegisterBroker(InitializeBroker)
 end

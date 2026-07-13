@@ -6,6 +6,11 @@ local addonRef = nil
 local moduleRef = nil
 local refreshFrame = nil
 
+local GetNetStats = GetNetStats
+local GetFramerate = GetFramerate
+local floor = math.floor
+local format = string.format
+
 local function ResolveBrokerLabel(noLabel, customLabel, fallback)
     if noLabel then
         return ""
@@ -32,66 +37,55 @@ local SYSTEM_BROKER_COLOR_DEFAULTS = {
     },
 }
 
-local function GetNetStatsFunction()
-    return rawget(_G, "GetNetStats")
-end
-
-local function GetFramerateFunction()
-    return rawget(_G, "GetFramerate")
-end
-
 local function GetHomeLatency()
-    local getNetStats = GetNetStatsFunction()
-    if type(getNetStats) ~= "function" then
+    if type(GetNetStats) ~= "function" then
         return nil
     end
 
-    local ok, bandwidthIn, bandwidthOut, latencyHome = pcall(getNetStats)
+    local ok, bandwidthIn, bandwidthOut, latencyHome = pcall(GetNetStats)
     if not ok then
         return nil
     end
 
     if type(latencyHome) == "number" then
-        return math.floor(latencyHome + 0.5)
+        return floor(latencyHome + 0.5)
     end
 
     return nil
 end
 
-local function GetWorldLatency()
-    local getNetStats = GetNetStatsFunction()
-    if type(getNetStats) ~= "function" then
+local function GetWorldLatency()    
+    if type(GetNetStats) ~= "function" then
         return nil
     end
 
-    local ok, bandwidthIn, bandwidthOut, latencyHome, latencyWorld = pcall(getNetStats)
+    local ok, bandwidthIn, bandwidthOut, latencyHome, latencyWorld = pcall(GetNetStats)
     if not ok then
         return nil
     end
 
     if type(latencyWorld) == "number" then
-        return math.floor(latencyWorld + 0.5)
+        return floor(latencyWorld + 0.5)
     end
 
     return nil
 end
 
 local function GetFPS()
-    local getFramerate = GetFramerateFunction()
-    if type(getFramerate) ~= "function" then
+    if type(GetFramerate) ~= "function" then
         return nil
     end
 
-    local ok, framerate = pcall(getFramerate)
+    local ok, framerate = pcall(GetFramerate)
     if not ok or type(framerate) ~= "number" then
         return nil
     end
 
-    return math.floor(framerate + 0.5)
+    return floor(framerate + 0.5)
 end
 
 local function ColorText(text, red, green, blue)
-    return string.format("|cff%02x%02x%02x%s|r", math.floor((red or 1) * 255), math.floor((green or 1) * 255), math.floor((blue or 1) * 255), tostring(text))
+    return format("|cff%02x%02x%02x%s|r", floor((red or 1) * 255), floor((green or 1) * 255), floor((blue or 1) * 255), tostring(text))
 end
 
 local function ResolveColor(colorValue, defaultColor)
@@ -286,23 +280,14 @@ local function InitializeBroker(addon, module, ldb)
     EnsureRefreshFrame()
     RefreshDataObject()
 
-    if moduleRef and type(moduleRef.RegisterCustomBrokerRefresher) == "function" then
-        moduleRef:RegisterCustomBrokerRefresher(RefreshDataObject)
+    if moduleRef and type(moduleRef.RegisterBrokerRefresher) == "function" then
+        moduleRef:RegisterBrokerRefresher(RefreshDataObject)
     end
 
     return brokerName
 end
 
-local function GetDatabrokersModule()
-    local hostAddon = type(ns) == "table" and ns.Addon
-    if hostAddon and type(hostAddon.GetModule) == "function" then
-        return hostAddon:GetModule("databrokers")
-    end
-
-    return nil
-end
-
-local databrokersModule = GetDatabrokersModule()
-if databrokersModule and type(databrokersModule.RegisterCustomBroker) == "function" then
-    databrokersModule:RegisterCustomBroker(InitializeBroker)
+local databrokersRegistry = type(ns) == "table" and ns.DataBrokers or nil
+if databrokersRegistry and type(databrokersRegistry.RegisterBroker) == "function" then
+    databrokersRegistry:RegisterBroker(InitializeBroker)
 end

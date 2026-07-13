@@ -5,14 +5,15 @@ if not Addon then
     return
 end
 
-local Module = {
-    customBrokerNames = {},
-    customBrokerInitializers = {},
-    customBrokerRefreshers = {},
+local DataBrokers = {
+    Names = {},
+    Initializers = {},
+    Refreshers = {},
     initialized = false,
 }
 
-Addon:RegisterModule("databrokers", Module)
+ns.DataBrokers = DataBrokers
+_G.Thisnthat_Databrokers_DataBrokers = DataBrokers
 
 local LDB = LibStub and LibStub("LibDataBroker-1.1", true)
 
@@ -21,43 +22,42 @@ local function AddCustomBrokerName(name)
         return
     end
 
-    for _, existingName in ipairs(Module.customBrokerNames) do
+    for _, existingName in ipairs(DataBrokers.Names) do
         if existingName == name then
             return
         end
     end
 
-    Module.customBrokerNames[#Module.customBrokerNames + 1] = name
-    table.sort(Module.customBrokerNames)
+    DataBrokers.Names[#DataBrokers.Names + 1] = name
+    table.sort(DataBrokers.Names)
 end
 
 local function BuildBrokerMap()
-    local byName = {}
+    local brokersByName = {}
     local names = {}
 
     if not LDB or type(LDB.DataObjectIterator) ~= "function" then
-        return byName, names
+        return brokersByName, names
     end
 
     for name, dataObject in LDB:DataObjectIterator() do
-        byName[name] = dataObject
+        brokersByName[name] = dataObject
         names[#names + 1] = name
     end
 
     table.sort(names)
-    return byName, names
+    return brokersByName, names
 end
 
-function Module:RegisterCustomBroker(initializer)
+function DataBrokers:RegisterBroker(initializer)
     if type(initializer) ~= "function" then
         return
     end
 
-    self.customBrokerInitializers[#self.customBrokerInitializers + 1] = initializer
+    self.Initializers[#self.Initializers + 1] = initializer
 
     if self.initialized then
-        local barsModule = Addon:GetModule("DatabrokerPanels")
-        local ok, brokerName = pcall(initializer, Addon, barsModule or self, LDB)
+        local ok, brokerName = pcall(initializer, Addon, self, LDB)
         if ok then
             AddCustomBrokerName(brokerName)
         else
@@ -66,16 +66,16 @@ function Module:RegisterCustomBroker(initializer)
     end
 end
 
-function Module:RegisterCustomBrokerRefresher(refresher)
+function DataBrokers:RegisterBrokerRefresher(refresher)
     if type(refresher) ~= "function" then
         return
     end
 
-    self.customBrokerRefreshers[#self.customBrokerRefreshers + 1] = refresher
+    self.Refreshers[#self.Refreshers + 1] = refresher
 end
 
-function Module:RefreshCustomBrokers()
-    for _, refresher in ipairs(self.customBrokerRefreshers) do
+function DataBrokers:RefreshCustomBrokers()
+    for _, refresher in ipairs(self.Refreshers) do
         local ok, err = pcall(refresher)
         if not ok then
             Addon:Print("Failed to refresh custom DataBroker: " .. tostring(err))
@@ -83,17 +83,15 @@ function Module:RefreshCustomBrokers()
     end
 end
 
-function Module:InitializeCustomBrokers()
+function DataBrokers:InitializeCustomBrokers()
     if self.initialized then
         return
     end
 
     self.initialized = true
 
-    local barsModule = Addon:GetModule("DatabrokerPanels")
-
-    for _, initializer in ipairs(self.customBrokerInitializers) do
-        local ok, brokerName = pcall(initializer, Addon, barsModule or self, LDB)
+    for _, initializer in ipairs(self.Initializers) do
+        local ok, brokerName = pcall(initializer, Addon, self, LDB)
         if ok then
             AddCustomBrokerName(brokerName)
         else
@@ -102,26 +100,19 @@ function Module:InitializeCustomBrokers()
     end
 end
 
-function Module:GetCustomBrokerNames()
+function DataBrokers:GetCustomBrokerNames()
     local out = {}
-    for i, name in ipairs(self.customBrokerNames) do
+    for i, name in ipairs(self.Names) do
         out[i] = name
     end
     return out
 end
 
 _G.Thisnthat_Databrokers_GetCustomBrokerNames = function()
-    return Module:GetCustomBrokerNames()
+    return DataBrokers:GetCustomBrokerNames()
 end
 
-function Module:GetAvailableBrokerNames()
+function DataBrokers:GetAvailableBrokerNames()
     local _, names = BuildBrokerMap()
     return names
-end
-
-function Module:OnInitialize()
-    self:InitializeCustomBrokers()
-end
-
-function Module:OnEnable()
 end

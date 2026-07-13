@@ -12,6 +12,16 @@ local levelPlayedSeconds = nil
 local loginTimestamp = time()
 local lastTimePlayedRequest = 0
 
+local GetGameTime = GetGameTime
+local GetSessionTime = GetSessionTime
+local C_DateAndTime = C_DateAndTime
+local GetQuestResetTime = GetQuestResetTime
+local RequestTimePlayed = RequestTimePlayed
+local ToggleCalendar = ToggleCalendar
+local CalendarFrame = CalendarFrame
+local ShowUIPanel = ShowUIPanel
+
+
 local function ResolveBrokerLabel(noLabel, customLabel, fallback)
     if noLabel then
         return ""
@@ -47,7 +57,7 @@ local function GetClockConfig()
     }
 end
 
-local function FormatHour(hour, minute, second, use24Hour, includeSeconds)
+local function FormatTime(hour, minute, second, use24Hour, includeSeconds)
     hour = tonumber(hour) or 0
     minute = tonumber(minute) or 0
     second = tonumber(second) or 0
@@ -84,15 +94,14 @@ end
 
 local function GetLocalTimeString(use24Hour, includeSeconds)
     local now = date("*t")
-    return FormatHour(now.hour, now.min, now.sec, use24Hour, includeSeconds)
+    return FormatTime(now.hour, now.min, now.sec, use24Hour, includeSeconds)
 end
 
 local function GetServerTimeString(use24Hour, includeSeconds)
-    local getGameTime = rawget(_G, "GetGameTime")
-    if type(getGameTime) == "function" then
-        local ok, hour, minute = pcall(getGameTime)
+    if type(GetGameTime) == "function" then
+        local ok, hour, minute = pcall(GetGameTime)
         if ok and type(hour) == "number" and type(minute) == "number" then
-            return FormatHour(hour, minute, 0, use24Hour, includeSeconds)
+            return FormatTime(hour, minute, 0, use24Hour, includeSeconds)
         end
     end
 
@@ -101,7 +110,7 @@ end
 
 local function GetUtcTimeString(use24Hour, includeSeconds)
     local now = date("!*t")
-    return FormatHour(now.hour, now.min, now.sec, use24Hour, includeSeconds)
+    return FormatTime(now.hour, now.min, now.sec, use24Hour, includeSeconds)
 end
 
 local function FormatDuration(seconds)
@@ -128,9 +137,8 @@ local function FormatDuration(seconds)
 end
 
 local function GetSessionPlayedSeconds()
-    local getSessionTime = rawget(_G, "GetSessionTime")
-    if type(getSessionTime) == "function" then
-        local ok, value = pcall(getSessionTime)
+    if type(GetSessionTime) == "function" then
+        local ok, value = pcall(GetSessionTime)
         if ok and type(value) == "number" then
             return value
         end
@@ -145,17 +153,15 @@ local function GetSessionPlayedSeconds()
 end
 
 local function GetSecondsUntilDailyReset()
-    local cDateAndTime = rawget(_G, "C_DateAndTime")
-    if type(cDateAndTime) == "table" and type(cDateAndTime.GetSecondsUntilDailyReset) == "function" then
-        local ok, seconds = pcall(cDateAndTime.GetSecondsUntilDailyReset)
+    if type(C_DateAndTime) == "table" and type(C_DateAndTime.GetSecondsUntilDailyReset) == "function" then
+        local ok, seconds = pcall(C_DateAndTime.GetSecondsUntilDailyReset)
         if ok and type(seconds) == "number" and seconds >= 0 then
             return seconds
         end
     end
 
-    local getQuestResetTime = rawget(_G, "GetQuestResetTime")
-    if type(getQuestResetTime) == "function" then
-        local ok, seconds = pcall(getQuestResetTime)
+    if type(GetQuestResetTime) == "function" then
+        local ok, seconds = pcall(GetQuestResetTime)
         if ok and type(seconds) == "number" and seconds >= 0 then
             return seconds
         end
@@ -170,13 +176,12 @@ local function RequestPlayedTime()
         return
     end
 
-    local requestTimePlayed = rawget(_G, "RequestTimePlayed")
-    if type(requestTimePlayed) ~= "function" then
+    if type(RequestTimePlayed) ~= "function" then
         return
     end
 
     lastTimePlayedRequest = now
-    pcall(requestTimePlayed)
+    pcall(RequestTimePlayed)
 end
 
 local function BuildText()
@@ -239,16 +244,13 @@ local function BuildTooltip(tooltip)
 end
 
 local function OpenCalendarWindow()
-    local toggleCalendar = rawget(_G, "ToggleCalendar")
-    if type(toggleCalendar) == "function" then
-        pcall(toggleCalendar)
+    if type(ToggleCalendar) == "function" then
+        pcall(ToggleCalendar)
         return
     end
 
-    local calendarFrame = rawget(_G, "CalendarFrame")
-    local showUIPanel = rawget(_G, "ShowUIPanel")
-    if calendarFrame and type(showUIPanel) == "function" then
-        pcall(showUIPanel, calendarFrame)
+    if CalendarFrame and type(ShowUIPanel) == "function" then
+        pcall(ShowUIPanel, CalendarFrame)
     end
 end
 
@@ -324,23 +326,14 @@ local function InitializeBroker(addon, module, ldb)
     RequestPlayedTime()
     RefreshDataObject()
 
-    if moduleRef and type(moduleRef.RegisterCustomBrokerRefresher) == "function" then
-        moduleRef:RegisterCustomBrokerRefresher(RefreshDataObject)
+    if moduleRef and type(moduleRef.RegisterBrokerRefresher) == "function" then
+        moduleRef:RegisterBrokerRefresher(RefreshDataObject)
     end
 
     return brokerName
 end
 
-local function GetDatabrokersModule()
-    local hostAddon = type(ns) == "table" and ns.Addon
-    if hostAddon and type(hostAddon.GetModule) == "function" then
-        return hostAddon:GetModule("databrokers")
-    end
-
-    return nil
-end
-
-local databrokersModule = GetDatabrokersModule()
-if databrokersModule and type(databrokersModule.RegisterCustomBroker) == "function" then
-    databrokersModule:RegisterCustomBroker(InitializeBroker)
+local databrokersRegistry = type(ns) == "table" and ns.DataBrokers or nil
+if databrokersRegistry and type(databrokersRegistry.RegisterBroker) == "function" then
+    databrokersRegistry:RegisterBroker(InitializeBroker)
 end

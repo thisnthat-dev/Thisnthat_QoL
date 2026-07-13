@@ -279,14 +279,6 @@ local function GetBrokerConfigForKey(db, key)
     return nil
 end
 
-local function GetDatabrokersModule(Addon)
-    if Addon and type(Addon.GetModule) == "function" then
-        return Addon:GetModule("databrokers")
-    end
-
-    return nil
-end
-
 local function CreateScrollableSection(parentFrame, anchorFrame, sectionKey, titleText, entries, rowBuilder, emptyText, topOffset)
     local section = CreateFrame("Frame", nil, parentFrame, "BackdropTemplate")
     local offsetY = type(topOffset) == "number" and topOffset or -10
@@ -666,8 +658,7 @@ function ns:InitDataBrokersPage()
     end
 
     local db = EnsureSelectionDB(Addon)
-    local standaloneAddon = GetStandaloneAddon()
-    local dbModule = standaloneAddon and standaloneAddon.GetModule and standaloneAddon:GetModule("databrokers") or nil
+    local dbModule = _G.Thisnthat_Databrokers_DataBrokers
     local brokerEntries = {}
     for _, def in ipairs(BROKER_DEFINITIONS) do
         brokerEntries[#brokerEntries + 1] = {
