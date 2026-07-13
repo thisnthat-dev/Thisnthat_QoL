@@ -18,6 +18,7 @@ local SHARED_MEDIA = {
         { name = "Thisnthat Border 1px", file = "textures\\border\\thisnthat_1px.tga" },
         { name = "Thisnthat Border 2px", file = "textures\\border\\thisnthat_2px.tga" },
         { name = "Thisnthat Border White 2px", file = "textures\\border\\thisnthat_w_2px.tga" },
+        { name = "1 Pixel", file = "Interface\\Buttons\\WHITE8X8" },
     },
     backgrounds = {
         { name = "Thisnthat Logo Wordmark", file = "textures\\logo_wordmark.png" },
@@ -94,8 +95,8 @@ local SHARED_MEDIA = {
     },
 }
 
-local function BuildSoundDisplayName(fallbackName)
-    return "|cFF00FF00" .. fallbackName .. "|r"
+local function BuildSoundDisplayName(name)
+    return "|cFF00FF00" .. name .. "|r"
 end
 
 local function RegisterMediaCollection(mediaType, collection)
@@ -123,45 +124,6 @@ local function RegisterSharedMedia()
     RegisterMediaCollection("border", SHARED_MEDIA.borders)
     RegisterMediaCollection("background", SHARED_MEDIA.backgrounds)
     RegisterMediaCollection("sound", SHARED_MEDIA.sounds)
-
-    LSM:Register("border", "1 Pixel", "Interface\\Buttons\\WHITE8X8")
-end
-
-local function RegisterElvUITags()
-    local elvUI = rawget(_G, "ElvUI")
-    local curveConstants = rawget(_G, "CurveConstants")
-    if type(elvUI) ~= "table" then
-        return
-    end
-
-    local E = unpack(elvUI)
-    if not E or type(E.AddTag) ~= "function" then
-        return
-    end
-
-    if not (C_CurveUtil and Enum and Enum.LuaCurveType and CreateColor and curveConstants and UnitHealthPercent) then
-        return
-    end
-
-    local colorCurve = C_CurveUtil.CreateColorCurve()
-    colorCurve:SetType(Enum.LuaCurveType.Linear)
-    colorCurve:AddPoint(0.0, CreateColor(1, 0.3, 0.31))
-    colorCurve:AddPoint(0.3, CreateColor(1, 0.3, 0.31))
-    colorCurve:AddPoint(0.5, CreateColor(1, 0.93, 0.43))
-    colorCurve:AddPoint(0.8, CreateColor(0.38, 0.87, 0.23))
-    colorCurve:AddPoint(1.0, CreateColor(0.38, 0.87, 0.23))
-
-    E:AddTag("health:percent-curvedcolor", "UNIT_HEALTH_FREQUENT UNIT_MAXHEALTH", function(unit)
-        local color = UnitHealthPercent(unit, false, colorCurve)
-        local value = UnitHealthPercent(unit, false, curveConstants.ScaleTo100)
-        local text = string.format("%.0f", value)
-        return color and color:WrapTextInColorCode(text) or text
-    end)
-
-    E:AddTag("healthcolor", "UNIT_HEALTH_FREQUENT UNIT_MAXHEALTH", function(unit)
-        local color = UnitHealthPercent(unit, false, colorCurve)
-        return color and color:GenerateHexColorMarkup() or ""
-    end)
 end
 
 local loader = CreateFrame("Frame")
@@ -172,7 +134,6 @@ loader:SetScript("OnEvent", function(_, _, loadedName)
     end
 
     RegisterSharedMedia()
-    RegisterElvUITags()
 
     loader:UnregisterEvent("ADDON_LOADED")
 end)
