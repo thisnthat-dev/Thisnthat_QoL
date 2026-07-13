@@ -6,6 +6,19 @@ local addonRef = nil
 local moduleRef = nil
 local refreshFrame = nil
 
+local function ResolveBrokerLabel(noLabel, customLabel, fallback)
+    if noLabel then
+        return ""
+    end
+
+    local label = type(customLabel) == "string" and string.match(customLabel, "^%s*(.-)%s*$") or ""
+    if label == "" then
+        return fallback
+    end
+
+    return label
+end
+
 local SYSTEM_BROKER_COLOR_DEFAULTS = {
     fpsColors = {
         critical = { r = 1, g = 0, b = 0, a = 1 },
@@ -92,6 +105,8 @@ local function GetSystemBrokerConfig()
     if type(config) ~= "table" then
         return {
             enabled = true,
+            noLabel = false,
+            customLabel = "",
         }
     end
 
@@ -199,6 +214,7 @@ local function RefreshDataObject()
     end
 
     local config = GetSystemBrokerConfig()
+    dataObject.label = ResolveBrokerLabel(config.noLabel, config.customLabel, "System")
     if config.enabled == false then
         dataObject.text = ""
         dataObject.icon = nil

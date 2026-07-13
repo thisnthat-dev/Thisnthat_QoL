@@ -17,11 +17,15 @@ local defaults = {
     databrokers = {
         clockBroker = {
             enabled = true,
+            noLabel = false,
+            customLabel = "",
             useServerTime = false,
             use24Hour = false,
         },
         durabilityColors = {
             enabled = true,
+            noLabel = false,
+            customLabel = "",
             ok = {
                 r = 0,
                 g = 1,
@@ -43,6 +47,8 @@ local defaults = {
         },
         systemBroker = {
             enabled = true,
+            noLabel = false,
+            customLabel = "",
             fpsColors = {
                 critical = { r = 1, g = 0, b = 0, a = 1 },
                 warning = { r = 1, g = 1, b = 0, a = 1 },
@@ -56,6 +62,8 @@ local defaults = {
         },
         specializationBroker = {
             enabled = true,
+            noLabel = false,
+            customLabel = "",
             hideLootIconWhenSame = true,
         },
         options = {

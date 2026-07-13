@@ -12,12 +12,27 @@ local levelPlayedSeconds = nil
 local loginTimestamp = time()
 local lastTimePlayedRequest = 0
 
+local function ResolveBrokerLabel(noLabel, customLabel, fallback)
+    if noLabel then
+        return ""
+    end
+
+    local label = type(customLabel) == "string" and string.match(customLabel, "^%s*(.-)%s*$") or ""
+    if label == "" then
+        return fallback
+    end
+
+    return label
+end
+
 local function GetClockConfig()
     local databrokers = addonRef and addonRef.db and addonRef.db.databrokers
     local cfg = databrokers and databrokers.clockBroker
     if type(cfg) ~= "table" then
         return {
             enabled = true,
+            noLabel = false,
+            customLabel = "",
             useServerTime = false,
             use24Hour = false,
         }
@@ -25,6 +40,8 @@ local function GetClockConfig()
 
     return {
         enabled = cfg.enabled ~= false,
+        noLabel = cfg.noLabel and true or false,
+        customLabel = type(cfg.customLabel) == "string" and cfg.customLabel or "",
         useServerTime = cfg.useServerTime and true or false,
         use24Hour = cfg.use24Hour and true or false,
     }
@@ -177,6 +194,7 @@ local function RefreshDataObject()
     end
 
     local cfg = GetClockConfig()
+    dataObject.label = ResolveBrokerLabel(cfg.noLabel, cfg.customLabel, "Clock")
     if cfg.enabled == false then
         dataObject.text = ""
         dataObject.icon = nil

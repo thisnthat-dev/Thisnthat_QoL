@@ -276,16 +276,20 @@ local function CreateButton(bar, barIndex, buttonIndex)
     button:SetBackdropBorderColor(0, 0, 0, 0)
 
     button.icon = button:CreateTexture(nil, "ARTWORK")
-    button.icon:SetPoint("LEFT", 4, 0)
     button.icon:SetSize(14, 14)
     button.icon:Hide()
 
-    button.text = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    button.text:SetPoint("LEFT", 6, 0)
-    button.text:SetPoint("RIGHT", -4, 0)
-    button.text:SetJustifyH("CENTER")
-    button.text:SetWordWrap(false)
-    button.text:SetMaxLines(1)
+    button.labelText = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    button.labelText:SetJustifyH("LEFT")
+    button.labelText:SetWordWrap(false)
+    button.labelText:SetMaxLines(1)
+
+    button.valueText = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    button.valueText:SetJustifyH("LEFT")
+    button.valueText:SetWordWrap(false)
+    button.valueText:SetMaxLines(1)
+
+    button.text = button.valueText
 
     button:SetScript("OnEnter", function(self)
         local dataObject = self.dataObject
@@ -322,6 +326,70 @@ local function CreateButton(bar, barIndex, buttonIndex)
     Module.buttons[barIndex][buttonIndex] = button
 
     return button
+end
+
+local function LayoutButtonContents(button, cfg)
+    local justify = NormalizeJustify(cfg and cfg.textJustify, "CENTER")
+    local insetLeft = 4
+    local insetRight = 4
+    local elementGap = 4
+    local availableWidth = math.max(0, (button:GetWidth() or 0) - insetLeft - insetRight)
+    local iconVisible = button.icon:IsShown()
+    local labelVisible = button.labelText:IsShown()
+    local valueVisible = button.valueText:IsShown()
+
+    local iconWidth = iconVisible and 14 or 0
+    local labelWidth = labelVisible and math.ceil(button.labelText:GetStringWidth() or 0) or 0
+    local valueWidth = valueVisible and math.ceil(button.valueText:GetStringWidth() or 0) or 0
+
+    local totalWidth = 0
+    if iconVisible then
+        totalWidth = totalWidth + iconWidth
+    end
+    if labelVisible then
+        if totalWidth > 0 then
+            totalWidth = totalWidth + elementGap
+        end
+        totalWidth = totalWidth + labelWidth
+    end
+    if valueVisible then
+        if totalWidth > 0 then
+            totalWidth = totalWidth + elementGap
+        end
+        totalWidth = totalWidth + valueWidth
+    end
+
+    if totalWidth > availableWidth then
+        totalWidth = availableWidth
+    end
+
+    local startX = insetLeft
+    if justify == "CENTER" then
+        startX = insetLeft + math.max(0, math.floor((availableWidth - totalWidth) / 2))
+    elseif justify == "RIGHT" then
+        startX = insetLeft + math.max(0, availableWidth - totalWidth)
+    end
+
+    local cursorX = startX
+
+    button.icon:ClearAllPoints()
+    if iconVisible then
+        button.icon:SetPoint("LEFT", button, "LEFT", cursorX, 0)
+        cursorX = cursorX + iconWidth + elementGap
+    end
+
+    button.labelText:ClearAllPoints()
+    if labelVisible then
+        button.labelText:SetPoint("LEFT", button, "LEFT", cursorX, 0)
+        cursorX = cursorX + labelWidth + elementGap
+    end
+
+    button.valueText:ClearAllPoints()
+    if valueVisible then
+        button.valueText:SetPoint("LEFT", button, "LEFT", cursorX, 0)
+        button.valueText:SetPoint("RIGHT", button, "RIGHT", -insetRight, 0)
+        button.valueText:SetJustifyH("LEFT")
+    end
 end
 
 function Module:HideAllBars()
@@ -426,7 +494,10 @@ end
 function Module:UpdateButtonVisual(button, cfg)
     local dataObject = button.dataObject
     if not dataObject then
-        button.text:SetText("")
+        button.labelText:SetText("")
+        button.valueText:SetText("")
+        button.labelText:Hide()
+        button.valueText:Hide()
         button.icon:Hide()
         button:SetAlpha(0.55)
         button:EnableMouse(false)
@@ -442,40 +513,25 @@ function Module:UpdateButtonVisual(button, cfg)
     local labelText = showLabel and tostring(dataObject.label or button.brokerName or "") or ""
     local valueText = showText and tostring(dataObject.text or "") or ""
 
-    local displayText
     if labelText ~= "" and valueText ~= "" then
-        displayText = labelText .. ": " .. valueText
-    elseif labelText ~= "" then
-        displayText = labelText
-    else
-        displayText = valueText
+        labelText = labelText .. ":"
     end
 
-    button.text:SetText(displayText)
+    button.labelText:SetText(labelText)
+    button.valueText:SetText(valueText)
+    button.labelText:SetShown(labelText ~= "")
+    button.valueText:SetShown(valueText ~= "")
     button:SetAlpha(1)
     button:EnableMouse(true)
-
-    local justify = NormalizeJustify(cfg and cfg.textJustify, "CENTER")
 
     if showIcon and dataObject.icon then
         button.icon:SetTexture(dataObject.icon)
         button.icon:Show()
-        button.icon:ClearAllPoints()
-        button.icon:SetPoint("LEFT", button, "LEFT", 4, 0)
-
-        button.text:ClearAllPoints()
-        button.text:SetPoint("LEFT", button.icon, "RIGHT", 4, 0)
-        button.text:SetPoint("RIGHT", button, "RIGHT", -4, 0)
-        button.text:SetWidth(0)
-        button.text:SetJustifyH(justify)
     else
         button.icon:Hide()
-        button.text:ClearAllPoints()
-        button.text:SetPoint("LEFT", 6, 0)
-        button.text:SetPoint("RIGHT", -4, 0)
-        button.text:SetWidth(0)
-        button.text:SetJustifyH(justify)
     end
+
+    LayoutButtonContents(button, cfg)
 
     button:Show()
 end
@@ -620,8 +676,12 @@ function Module:RefreshBars()
                     button:SetBackdropColor(0, 0, 0, 0)
                     button:SetBackdropBorderColor(0, 0, 0, 0)
                     button.text:SetFont(buttonFontPath, buttonFontSize, buttonFontFlags)
-                    button.text:SetWordWrap(false)
-                    button.text:SetMaxLines(1)
+                    button.labelText:SetFont(buttonFontPath, buttonFontSize, buttonFontFlags)
+                    button.labelText:SetWordWrap(false)
+                    button.labelText:SetMaxLines(1)
+                    button.valueText:SetFont(buttonFontPath, buttonFontSize, buttonFontFlags)
+                    button.valueText:SetWordWrap(false)
+                    button.valueText:SetMaxLines(1)
                     button:SetParent(bar)
                     button:ClearAllPoints()
                     if buttonIndex == 1 then
@@ -643,8 +703,12 @@ function Module:RefreshBars()
                     button:SetBackdropColor(0, 0, 0, 0)
                     button:SetBackdropBorderColor(0, 0, 0, 0)
                     button.text:SetFont(buttonFontPath, buttonFontSize, buttonFontFlags)
-                    button.text:SetWordWrap(false)
-                    button.text:SetMaxLines(1)
+                    button.labelText:SetFont(buttonFontPath, buttonFontSize, buttonFontFlags)
+                    button.labelText:SetWordWrap(false)
+                    button.labelText:SetMaxLines(1)
+                    button.valueText:SetFont(buttonFontPath, buttonFontSize, buttonFontFlags)
+                    button.valueText:SetWordWrap(false)
+                    button.valueText:SetMaxLines(1)
                     button:ClearAllPoints()
                     if buttonIndex == 1 then
                         button:SetPoint("LEFT", bar, "LEFT", 0, 0)

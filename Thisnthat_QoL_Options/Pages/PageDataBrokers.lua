@@ -108,6 +108,15 @@ local function EnsureColor(colorValue, defaultColor)
     }
 end
 
+local function NormalizeCustomLabel(value)
+    if type(value) ~= "string" then
+        return ""
+    end
+
+    local trimmed = string.match(value, "^%s*(.-)%s*$") or ""
+    return trimmed
+end
+
 local function ResolveBrokerKey(value)
     if type(value) ~= "string" or value == "" then
         return nil
@@ -125,6 +134,8 @@ end
 local function EnsureClockConfig(db)
     db.clockBroker = type(db.clockBroker) == "table" and db.clockBroker or {}
     db.clockBroker.enabled = db.clockBroker.enabled ~= false
+    db.clockBroker.noLabel = db.clockBroker.noLabel and true or false
+    db.clockBroker.customLabel = NormalizeCustomLabel(db.clockBroker.customLabel)
     db.clockBroker.useServerTime = db.clockBroker.useServerTime and true or false
     db.clockBroker.use24Hour = db.clockBroker.use24Hour and true or false
     return db.clockBroker
@@ -133,6 +144,8 @@ end
 local function EnsureDurabilityConfig(db)
     db.durabilityColors = type(db.durabilityColors) == "table" and db.durabilityColors or {}
     db.durabilityColors.enabled = db.durabilityColors.enabled ~= false
+    db.durabilityColors.noLabel = db.durabilityColors.noLabel and true or false
+    db.durabilityColors.customLabel = NormalizeCustomLabel(db.durabilityColors.customLabel)
     db.durabilityColors.ok = EnsureColor(db.durabilityColors.ok, DURABILITY_DEFAULTS.ok)
     db.durabilityColors.warning = EnsureColor(db.durabilityColors.warning, DURABILITY_DEFAULTS.warning)
     db.durabilityColors.critical = EnsureColor(db.durabilityColors.critical, DURABILITY_DEFAULTS.critical)
@@ -142,6 +155,8 @@ end
 local function EnsureSystemConfig(db)
     db.systemBroker = type(db.systemBroker) == "table" and db.systemBroker or {}
     db.systemBroker.enabled = db.systemBroker.enabled ~= false
+    db.systemBroker.noLabel = db.systemBroker.noLabel and true or false
+    db.systemBroker.customLabel = NormalizeCustomLabel(db.systemBroker.customLabel)
     db.systemBroker.fpsColors = type(db.systemBroker.fpsColors) == "table" and db.systemBroker.fpsColors or {}
     db.systemBroker.latencyColors = type(db.systemBroker.latencyColors) == "table" and db.systemBroker.latencyColors or {}
     db.systemBroker.fpsColors.critical = EnsureColor(db.systemBroker.fpsColors.critical, SYSTEM_DEFAULTS.fpsColors.critical)
@@ -156,6 +171,8 @@ end
 local function EnsureSpecializationConfig(db)
     db.specializationBroker = type(db.specializationBroker) == "table" and db.specializationBroker or {}
     db.specializationBroker.enabled = db.specializationBroker.enabled ~= false
+    db.specializationBroker.noLabel = db.specializationBroker.noLabel and true or false
+    db.specializationBroker.customLabel = NormalizeCustomLabel(db.specializationBroker.customLabel)
     if db.specializationBroker.hideLootIconWhenSame == nil then
         db.specializationBroker.hideLootIconWhenSame = true
     else
@@ -311,7 +328,20 @@ local function CreateScrollableSection(parentFrame, anchorFrame, sectionKey, tit
     content:SetPoint("TOPLEFT", headerBtn, "BOTTOMLEFT", 0, -4)
     content:SetPoint("TOPRIGHT", headerBtn, "BOTTOMRIGHT", 0, -4)
 
+    local isOpen = true
+    if sectionKey and type(sectionKey) == "string" then
+        local rootDB = GetStandaloneDBRoot()
+        rootDB.databrokers.options = type(rootDB.databrokers.options) == "table" and rootDB.databrokers.options or {}
+        rootDB.databrokers.options.leftSectionState = type(rootDB.databrokers.options.leftSectionState) == "table" and rootDB.databrokers.options.leftSectionState or {}
+        if rootDB.databrokers.options.leftSectionState[sectionKey] == nil then
+            rootDB.databrokers.options.leftSectionState[sectionKey] = true
+        end
+        isOpen = rootDB.databrokers.options.leftSectionState[sectionKey] ~= false
+    end
+    icon:SetText(isOpen and "-" or "+")
+
     local function Rebuild(open)
+        content:SetShown(open and true or false)
         if not open then
             section:SetHeight(30)
             return 30
@@ -422,12 +452,18 @@ local function CreateScrollableSection(parentFrame, anchorFrame, sectionKey, tit
         return sectionHeight
     end
 
-    section.open = true
+    section.open = isOpen
     section.Rebuild = Rebuild
-    Rebuild(true)
+    Rebuild(section.open)
 
     headerBtn:SetScript("OnClick", function()
         section.open = not section.open
+        if sectionKey and type(sectionKey) == "string" then
+            local rootDB = GetStandaloneDBRoot()
+            rootDB.databrokers.options.leftSectionState = type(rootDB.databrokers.options.leftSectionState) == "table" and rootDB.databrokers.options.leftSectionState or {}
+            rootDB.databrokers.options.leftSectionState[sectionKey] = section.open and true or false
+            SyncStandaloneAddonDB()
+        end
         icon:SetText(section.open and "-" or "+")
         Rebuild(section.open)
     end)
@@ -444,7 +480,7 @@ local function SetPaletteColor(target, key, defaultColor, r, g, b, a)
     }
 end
 
-local function BuildPaletteControls(builder, palette, entries)
+local function BuildPaletteControls(builder, palette, entries, onChanged)
     for _, entry in ipairs(entries) do
         builder:Color(entry.label,
             function()
@@ -453,54 +489,119 @@ local function BuildPaletteControls(builder, palette, entries)
             end,
             function(r, g, b, a)
                 SetPaletteColor(palette, entry.key, entry.default, r, g, b, a)
+                if onChanged then
+                    onChanged()
+                end
             end,
             true)
     end
 end
 
-local function BuildClockPanel(builder, cfg)
+local function BuildBrokerSettingsPanel(builder, cfg, onChanged)
+    local row = CreateFrame("Frame", nil, builder.parent, "BackdropTemplate")
+    row:SetHeight(34)
+    row:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
+    row:SetBackdropColor(C.BLUE.r, C.BLUE.g, C.BLUE.b, 0.14)
+    row:SetBackdropBorderColor(C.BLUE.r, C.BLUE.g, C.BLUE.b, 0.4)
+
+    local noLabelCheck = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+    noLabelCheck:SetSize(20, 20)
+    noLabelCheck:SetPoint("LEFT", row, "LEFT", 8, 0)
+    noLabelCheck:SetChecked(cfg.noLabel and true or false)
+    noLabelCheck:SetScript("OnClick", function(self)
+        cfg.noLabel = self:GetChecked() and true or false
+        if onChanged then
+            onChanged()
+        end
+    end)
+
+    local noLabelText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    noLabelText:SetPoint("LEFT", noLabelCheck, "RIGHT", 2, 0)
+    noLabelText:SetText("No Label")
+    noLabelText:SetTextColor(C.WHITE.r, C.WHITE.g, C.WHITE.b, 0.9)
+    W.ApplyFont(noLabelText, -1)
+
+    local customLabelText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    customLabelText:SetPoint("LEFT", noLabelText, "RIGHT", 16, 0)
+    customLabelText:SetText("Custom Label")
+    customLabelText:SetTextColor(C.WHITE.r, C.WHITE.g, C.WHITE.b, 0.9)
+    W.ApplyFont(customLabelText, -1)
+
+    local edit = CreateFrame("EditBox", nil, row, "BackdropTemplate")
+    edit:SetHeight(22)
+    edit:SetPoint("LEFT", customLabelText, "RIGHT", 8, 0)
+    edit:SetPoint("RIGHT", row, "RIGHT", -10, 0)
+    edit:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
+    edit:SetBackdropColor(0.05, 0.05, 0.05, 0.95)
+    edit:SetBackdropBorderColor(C.BLUE.r, C.BLUE.g, C.BLUE.b, 0.55)
+    W.ApplyFont(edit, -1)
+    edit:SetTextColor(1, 1, 1, 0.9)
+    edit:SetTextInsets(6, 6, 0, 0)
+    edit:SetAutoFocus(false)
+    edit:SetMaxLetters(64)
+    edit:SetText(cfg.customLabel or "")
+    edit:SetScript("OnEnterPressed", function(self)
+        cfg.customLabel = NormalizeCustomLabel(self:GetText())
+        self:SetText(cfg.customLabel or "")
+        self:ClearFocus()
+        if onChanged then
+            onChanged()
+        end
+    end)
+    edit:SetScript("OnEscapePressed", function(self)
+        self:SetText(cfg.customLabel or "")
+        self:ClearFocus()
+    end)
+    row:SetScript("OnShow", function()
+        noLabelCheck:SetChecked(cfg.noLabel and true or false)
+        edit:SetText(cfg.customLabel or "")
+    end)
+
+    builder:_Attach(row, 34, 4)
+end
+
+local function BuildClockPanel(builder, cfg, onChanged)
     builder:Desc("These settings control the text formatting for the clock broker.")
     builder:Toggle("Use Server Time",
         function() return cfg.useServerTime end,
         function(v)
             cfg.useServerTime = v and true or false
+            if onChanged then
+                onChanged()
+            end
         end)
 
     builder:Toggle("Use 24 Hour Format",
         function() return cfg.use24Hour end,
         function(v)
             cfg.use24Hour = v and true or false
+            if onChanged then
+                onChanged()
+            end
         end)
 end
 
-local function BuildDurabilityPanel(builder, cfg)
+local function BuildDurabilityPanel(builder, cfg, onChanged)
     builder:Desc("Durability colors are used at 20%, 50%, and above 50% durability.")
     BuildPaletteControls(builder, cfg, {
         { key = "critical", label = "Critical", default = DURABILITY_DEFAULTS.critical },
         { key = "warning", label = "Warning", default = DURABILITY_DEFAULTS.warning },
         { key = "ok", label = "OK", default = DURABILITY_DEFAULTS.ok },
-    })
+    }, onChanged)
 end
 
-local function BuildSystemPanel(builder, cfg)
-    builder:Desc("These colors control the system broker's FPS and latency value presentation.")
+local function BuildSystemPanel(builder, cfg, onChanged)
+    builder:Desc("These colors control the FPS portion of the system broker display.")
     builder:Header("FPS Colors")
     BuildPaletteControls(builder, cfg.fpsColors, {
         { key = "critical", label = "Critical", default = SYSTEM_DEFAULTS.fpsColors.critical },
         { key = "warning", label = "Warning", default = SYSTEM_DEFAULTS.fpsColors.warning },
         { key = "ok", label = "OK", default = SYSTEM_DEFAULTS.fpsColors.ok },
-    })
-
-    builder:Header("Latency Colors")
-    BuildPaletteControls(builder, cfg.latencyColors, {
-        { key = "critical", label = "Critical", default = SYSTEM_DEFAULTS.latencyColors.critical },
-        { key = "warning", label = "Warning", default = SYSTEM_DEFAULTS.latencyColors.warning },
-        { key = "ok", label = "OK", default = SYSTEM_DEFAULTS.latencyColors.ok },
-    })
+    }, onChanged)
 end
 
 local function BuildSpecializationPanel(builder)
-    builder:Desc("This broker currently uses live specialization state and has no broker-specific settings yet.")
+    builder:Desc("Configure the specialization broker label and icon behavior.")
 end
 
 function ns:InitDataBrokersPage()
@@ -589,6 +690,13 @@ function ns:InitDataBrokersPage()
     local panelRowRefs = {}
     local RenderRightPane
 
+    local function RefreshStandaloneBrokers()
+        SyncStandaloneAddonDB()
+        if dbModule and type(dbModule.RefreshCustomBrokers) == "function" then
+            dbModule:RefreshCustomBrokers()
+        end
+    end
+
     local function ApplyRowVisual(ref, isSelected)
         if not ref or not ref.row or not ref.text then
             return
@@ -656,11 +764,8 @@ function ns:InitDataBrokersPage()
         toggle:SetScript("OnClick", function(self)
             if brokerCfg then
                 brokerCfg.enabled = self:GetChecked() and true or false
-                SyncStandaloneAddonDB()
+                RefreshStandaloneBrokers()
                 UpdateLeftSelectionVisuals()
-                if dbModule and type(dbModule.RefreshCustomBrokers) == "function" then
-                    dbModule:RefreshCustomBrokers()
-                end
             end
         end)
 
@@ -761,21 +866,25 @@ function ns:InitDataBrokersPage()
         end
 
         if selectedEntry.key == "clockBroker" then
-            AddCard("clock", "Clock Settings", function(builder)
-                BuildClockPanel(builder, clockCfg)
+            AddCard("broker_settings", "Broker", function(builder)
+                BuildBrokerSettingsPanel(builder, clockCfg, RefreshStandaloneBrokers)
+            end, true)
+            AddCard("clock", "Clock", function(builder)
+                BuildClockPanel(builder, clockCfg, RefreshStandaloneBrokers)
             end, true)
         elseif selectedEntry.key == "durabilityColors" then
+            AddCard("broker_settings", "Broker", function(builder)
+                BuildBrokerSettingsPanel(builder, durabilityCfg, RefreshStandaloneBrokers)
+            end, true)
             AddCard("durability", "Durability Colors", function(builder)
-                BuildDurabilityPanel(builder, durabilityCfg)
+                BuildDurabilityPanel(builder, durabilityCfg, RefreshStandaloneBrokers)
             end, true)
         elseif selectedEntry.key == "systemBroker" then
+            AddCard("broker_settings", "Broker", function(builder)
+                BuildBrokerSettingsPanel(builder, systemCfg, RefreshStandaloneBrokers)
+            end, true)
             AddCard("fps", "FPS Colors", function(builder)
-                builder:Desc("Color thresholds used for the FPS part of the broker text.")
-                BuildPaletteControls(builder, systemCfg.fpsColors, {
-                    { key = "critical", label = "Critical", default = SYSTEM_DEFAULTS.fpsColors.critical },
-                    { key = "warning", label = "Warning", default = SYSTEM_DEFAULTS.fpsColors.warning },
-                    { key = "ok", label = "OK", default = SYSTEM_DEFAULTS.fpsColors.ok },
-                })
+                BuildSystemPanel(builder, systemCfg, RefreshStandaloneBrokers)
             end, true)
 
             AddCard("latency", "Latency Colors", function(builder)
@@ -784,21 +893,21 @@ function ns:InitDataBrokersPage()
                     { key = "critical", label = "Critical", default = SYSTEM_DEFAULTS.latencyColors.critical },
                     { key = "warning", label = "Warning", default = SYSTEM_DEFAULTS.latencyColors.warning },
                     { key = "ok", label = "OK", default = SYSTEM_DEFAULTS.latencyColors.ok },
-                })
+                }, RefreshStandaloneBrokers)
             end, true)
         elseif selectedEntry.key == "specializationBroker" then
+            AddCard("broker_settings", "Broker", function(builder)
+                BuildBrokerSettingsPanel(builder, specializationCfg, RefreshStandaloneBrokers)
+            end, true)
             AddCard("specialization", "Specialization", function(builder)
                 BuildSpecializationPanel(builder)
-                builder:Toggle("Hide loot icon when talent and loot specs match",
+                builder:Toggle("Hide loot icon when talent and loot specialization match",
                     function()
                         return specializationCfg.hideLootIconWhenSame ~= false
                     end,
                     function(value)
                         specializationCfg.hideLootIconWhenSame = value and true or false
-                        SyncStandaloneAddonDB()
-                        if dbModule and type(dbModule.RefreshCustomBrokers) == "function" then
-                            dbModule:RefreshCustomBrokers()
-                        end
+                        RefreshStandaloneBrokers()
                     end)
             end, true)
         end

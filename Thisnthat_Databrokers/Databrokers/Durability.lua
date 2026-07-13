@@ -6,6 +6,19 @@ local addonRef = nil
 local moduleRef = nil
 local eventFrame = nil
 
+local function ResolveBrokerLabel(noLabel, customLabel, fallback)
+    if noLabel then
+        return ""
+    end
+
+    local label = type(customLabel) == "string" and string.match(customLabel, "^%s*(.-)%s*$") or ""
+    if label == "" then
+        return fallback
+    end
+
+    return label
+end
+
 local DURABILITY_COLORS = {
     green = { r = 0, g = 1, b = 0 },
     yellow = { r = 1, g = 1, b = 0 },
@@ -40,6 +53,8 @@ local function GetDurabilityBrokerConfig()
     if type(config) ~= "table" then
         return {
             enabled = true,
+            noLabel = false,
+            customLabel = "",
         }
     end
 
@@ -144,11 +159,11 @@ end
 local function BuildText()
     local lowestPercent = BuildDurabilitySnapshot()
     if type(lowestPercent) ~= "number" then
-        return "Durability: --"
+        return ""
     end
 
     local red, green, blue = GetDurabilityColor(lowestPercent)
-    return "Durability: " .. ColorText(lowestPercent .. "%", red, green, blue)
+    return ColorText(lowestPercent .. "%", red, green, blue)
 end
 
 local function RefreshDataObject()
@@ -157,6 +172,7 @@ local function RefreshDataObject()
     end
 
     local config = GetDurabilityBrokerConfig()
+    dataObject.label = ResolveBrokerLabel(config.noLabel, config.customLabel, "Durability")
     if config.enabled == false then
         dataObject.text = ""
         dataObject.icon = nil

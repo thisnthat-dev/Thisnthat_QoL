@@ -11,6 +11,19 @@ local moduleRef = nil
 local eventFrame = nil
 local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
 
+local function ResolveBrokerLabel(noLabel, customLabel, fallback)
+    if noLabel then
+        return ""
+    end
+
+    local label = type(customLabel) == "string" and string.match(customLabel, "^%s*(.-)%s*$") or ""
+    if label == "" then
+        return fallback
+    end
+
+    return label
+end
+
 local function GetCurrentSpecializationIndex()
     local getSpecialization = rawget(_G, "GetSpecialization")
     local specIndex = type(getSpecialization) == "function" and getSpecialization() or nil
@@ -384,6 +397,8 @@ local function GetSpecializationBrokerConfig()
     if type(config) ~= "table" then
         return {
             enabled = true,
+            noLabel = false,
+            customLabel = "",
             hideLootIconWhenSame = true,
         }
     end
@@ -688,6 +703,7 @@ local function RefreshDataObject()
     end
 
     local config = GetSpecializationBrokerConfig()
+    dataObject.label = ResolveBrokerLabel(config.noLabel, config.customLabel, "Specialization")
     if config.enabled == false then
         dataObject.text = ""
         dataObject.icon = nil
