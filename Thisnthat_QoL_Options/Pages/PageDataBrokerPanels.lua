@@ -280,26 +280,10 @@ function ns:InitDataBrokerPanelsPage()
 
     local leftPaneWidth = 340
 
-    local leftPane = CreateFrame("Frame", nil, body, "BackdropTemplate")
+    local leftPane = CreateFrame("Frame", nil, body)
     leftPane:SetPoint("TOPLEFT", body, "TOPLEFT", 0, 0)
     leftPane:SetPoint("LEFT", body, "LEFT", 0, 0)
     leftPane:SetWidth(leftPaneWidth)
-    leftPane:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
-    leftPane:SetBackdropColor(0.02, 0.02, 0.02, 0.45)
-    leftPane:SetBackdropBorderColor(C.BLUE.r, C.BLUE.g, C.BLUE.b, 0.4)
-
-    local leftHeader = CreateFrame("Frame", nil, leftPane, "BackdropTemplate")
-    leftHeader:SetPoint("TOPLEFT", leftPane, "TOPLEFT", 1, -1)
-    leftHeader:SetPoint("TOPRIGHT", leftPane, "TOPRIGHT", -1, -1)
-    leftHeader:SetHeight(28)
-    leftHeader:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
-    leftHeader:SetBackdropColor(C.BLUE.r, C.BLUE.g, C.BLUE.b, 0.22)
-
-    local leftHeaderText = leftHeader:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    leftHeaderText:SetPoint("LEFT", leftHeader, "LEFT", 8, 0)
-    leftHeaderText:SetText("Panels")
-    leftHeaderText:SetTextColor(C.ACCENT.r, C.ACCENT.g, C.ACCENT.b, 1)
-    ApplyFont(leftHeaderText, 0)
 
     local rightPane = CreateFrame("Frame", nil, body)
     rightPane:SetPoint("TOPLEFT", leftPane, "TOPRIGHT", 10, 0)
@@ -332,6 +316,20 @@ function ns:InitDataBrokerPanelsPage()
         ns:InitDataBrokerPanelsPage()
     end
 
+    local function GetCustomBrokerNames()
+        local getter = rawget(_G, "Thisnthat_Databrokers_GetCustomBrokerNames")
+        if type(getter) ~= "function" then
+            return {}
+        end
+
+        local ok, names = pcall(getter)
+        if ok and type(names) == "table" then
+            return names
+        end
+
+        return {}
+    end
+
     enableToggle:SetScript("OnClick", function(self)
         Addon.db.modules.DatabrokerPanels = Addon.db.modules.DatabrokerPanels or {}
         Addon.db.modules.DatabrokerPanels.enabled = self:GetChecked() and true or false
@@ -345,6 +343,10 @@ function ns:InitDataBrokerPanelsPage()
     end)
 
     local availableBrokerNames = type(dbModule.GetAvailableBrokerNames) == "function" and (dbModule:GetAvailableBrokerNames() or {}) or {}
+    if #availableBrokerNames == 0 then
+        availableBrokerNames = GetCustomBrokerNames()
+    end
+
     if #availableBrokerNames > 0 then
         wipe(db.availableBrokerCache)
         for _, brokerName in ipairs(availableBrokerNames) do
@@ -457,10 +459,11 @@ function ns:InitDataBrokerPanelsPage()
         end
     end
 
-    local function CreateScrollableSection(parentFrame, anchorFrame, sectionKey, titleText, entries, rowBuilder, emptyText)
+    local function CreateScrollableSection(parentFrame, anchorFrame, sectionKey, titleText, entries, rowBuilder, emptyText, topOffset)
         local section = CreateFrame("Frame", nil, parentFrame, "BackdropTemplate")
-        section:SetPoint("TOPLEFT", anchorFrame, "BOTTOMLEFT", 0, -10)
-        section:SetPoint("TOPRIGHT", anchorFrame, "BOTTOMRIGHT", 0, -10)
+        local offsetY = type(topOffset) == "number" and topOffset or -10
+        section:SetPoint("TOPLEFT", anchorFrame, anchorFrame == parentFrame and "TOPLEFT" or "BOTTOMLEFT", 0, offsetY)
+        section:SetPoint("TOPRIGHT", anchorFrame, anchorFrame == parentFrame and "TOPRIGHT" or "BOTTOMRIGHT", 0, offsetY)
         section:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
         section:SetBackdropColor(0.02, 0.02, 0.02, 0.45)
         section:SetBackdropBorderColor(C.BLUE.r, C.BLUE.g, C.BLUE.b, 0.4)
@@ -501,7 +504,7 @@ function ns:InitDataBrokerPanelsPage()
         local rowCount = #entries
         local useEmpty = rowCount == 0 and emptyText
         local fullRows = useEmpty and 1 or rowCount
-        local visibleRows = math.min(8, math.max(1, fullRows))
+        local visibleRows = 8
         local rowHeight = 30
         local rowGap = 4
         local viewHeight = (visibleRows * rowHeight) + ((visibleRows - 1) * rowGap)
@@ -514,7 +517,7 @@ function ns:InitDataBrokerPanelsPage()
 
         local child = CreateFrame("Frame", nil, scroll)
         child:SetWidth(10)
-        local childHeight = (fullRows * rowHeight) + ((fullRows - 1) * rowGap)
+        local childHeight = math.max(viewHeight, (fullRows * rowHeight) + ((fullRows - 1) * rowGap))
         child:SetHeight(math.max(viewHeight, childHeight))
         scroll:SetScrollChild(child)
 
@@ -672,12 +675,13 @@ function ns:InitDataBrokerPanelsPage()
 
     local panelsSection, panelsSectionHeight = CreateScrollableSection(
         leftPane,
-        leftHeader,
+        leftPane,
         "panels",
         "Panels",
         panelEntries,
         BuildPanelRow,
-        nil
+        nil,
+        0
     )
 
     local _, brokersSectionHeight = CreateScrollableSection(
