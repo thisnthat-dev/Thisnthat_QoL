@@ -23,22 +23,9 @@ local defaults = {
         PerformanceSettings = {
             enabled = true,
         },
-        KickAssist = {
-            enabled = true,
-        },
         MPlusRewards = {
             enabled = true,
         },
-    },
-    KickAssist = {
-        markerIndex = 4,
-        interruptSpell = "AUTO",
-        announceOnReadyCheck = false,
-        announceTemplate = "My Kick target is {RAIDMARKER}",
-        announceInMythicPlus = true,
-        announceInMythicDungeon = false,
-        announceInHeroicDungeon = false,
-        announceInNormalDungeon = false,
     },
     databrokers = {
         unlocked = false,

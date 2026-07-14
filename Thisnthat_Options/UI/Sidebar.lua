@@ -21,6 +21,19 @@ local function IsDatabrokersAddonLoaded()
     return false
 end
 
+local function IsKickAssistAddonLoaded()
+    if C_AddOns and type(C_AddOns.IsAddOnLoaded) == "function" then
+        return C_AddOns.IsAddOnLoaded("Thisnthat_KickAssist") and true or false
+    end
+
+    local isAddOnLoaded = rawget(_G, "IsAddOnLoaded")
+    if type(isAddOnLoaded) == "function" then
+        return isAddOnLoaded("Thisnthat_KickAssist") and true or false
+    end
+
+    return false
+end
+
 local sidebar = CreateFrame("Frame", nil, ns.OptionsFrame, "BackdropTemplate")
 sidebar:SetWidth(178)
 sidebar:SetPoint("TOPLEFT",    ns.OptionsFrame, "TOPLEFT",    1, -1)
@@ -87,6 +100,10 @@ local tabReg      = {}
 local groupStates = {}
 local allGroups   = {}
 
+local function HasTabKey(tabKey)
+    return tabReg[tabKey] ~= nil
+end
+
 local function RecalcLayout()
     local y = 0
     for _, g in ipairs(allGroups) do
@@ -115,6 +132,7 @@ local function SwitchTab(btn, initFn)
     if not ns.OptionsFrame then return end
     ns.OptionsFrame:ResetContent()
     selectedBtn = btn
+    ns.CurrentTabKey = btn and btn.tabKey or nil
     indicator:ClearAllPoints()
     indicator:SetPoint("TOPLEFT",    btn, "TOPLEFT",    0, 0)
     indicator:SetPoint("BOTTOMLEFT", btn, "BOTTOMLEFT", 0, 0)
@@ -224,6 +242,22 @@ local function CreateGroup(name, label, childDefs)
     allGroups[#allGroups + 1] = { name = name, header = hdr, children = children }
 end
 
+local function AddChildToGroup(groupName, childDef)
+    if not childDef or not childDef.key or HasTabKey(childDef.key) then
+        return
+    end
+
+    for _, group in ipairs(allGroups) do
+        if group.name == groupName then
+            local child = MakeChildBtn(childDef.label, childDef.onClick, childDef.key)
+            group.children[#group.children + 1] = child
+            tabReg[childDef.key] = { button = child, groupName = groupName, initFn = childDef.onClick }
+            RecalcLayout()
+            return
+        end
+    end
+end
+
 -- Navigation tree
 CreateGroup("general", "General", {
     { key = "addon_settings", label = "Addon Settings",
@@ -235,11 +269,17 @@ local moduleEntries = {
             onClick = function() if ns.InitDataBrokerPanelsPage then ns:InitDataBrokerPanelsPage() end end },
         { key = "PerformanceSettings", label = "Performance",
             onClick = function() if ns.InitPerformancePage then ns:InitPerformancePage() end end },
-        { key = "KickAssist", label = "Kick Assist",
-            onClick = function() if ns.InitKickAssistPage then ns:InitKickAssistPage() end end },
         { key = "MPlusRewards", label = "M+ Rewards",
             onClick = function() if ns.InitMPlusRewardsPage then ns:InitMPlusRewardsPage() end end },
 }
+
+if IsKickAssistAddonLoaded() then
+        table.insert(moduleEntries, {
+                key = "KickAssist",
+                label = "Kick Assist",
+                onClick = function() if ns.InitKickAssistPage then ns:InitKickAssistPage() end end,
+        })
+end
 
 if IsDatabrokersAddonLoaded() then
         table.insert(moduleEntries, 1, {
@@ -283,6 +323,20 @@ _G.Thisnthat_ShowOptions = function(tabKey)
     end
 end
 
+_G.Thisnthat_RefreshOptionsTab = function(tabKey)
+    if not ns.OptionsFrame or not ns.OptionsFrame:IsShown() then
+        return
+    end
+
+    if tabKey and ns.CurrentTabKey ~= tabKey then
+        return
+    end
+
+    if type(ns.RefreshCurrentPage) == "function" then
+        ns.RefreshCurrentPage()
+    end
+end
+
 function ns:RefreshSidebarAccent()
     hAccent:SetColorTexture(C.ACCENT.r, C.ACCENT.g, C.ACCENT.b, 1)
     indicator:SetColorTexture(C.ACCENT.r, C.ACCENT.g, C.ACCENT.b, 1)
@@ -306,4 +360,18 @@ end
 
 local loader = CreateFrame("Frame")
 loader:RegisterEvent("PLAYER_LOGIN")
-loader:SetScript("OnEvent", function() RecalcLayout() end)
+loader:RegisterEvent("ADDON_LOADED")
+loader:SetScript("OnEvent", function(_, event, loadedName)
+    if event == "PLAYER_LOGIN" then
+        RecalcLayout()
+        return
+    end
+
+    if loadedName == "Thisnthat_KickAssist" and IsKickAssistAddonLoaded() then
+        AddChildToGroup("modules", {
+            key = "KickAssist",
+            label = "Kick Assist",
+            onClick = function() if ns.InitKickAssistPage then ns:InitKickAssistPage() end end,
+        })
+    end
+end)

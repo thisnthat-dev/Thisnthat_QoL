@@ -4,6 +4,7 @@
 ## Author: Thisnthat
 ## Version: 0.1.0
 ## RequiredDeps: Thisnthat
+## OptionalDeps: Thisnthat_KickAssist
 ## LoadOnDemand: 1
 
 Bootstrap.lua

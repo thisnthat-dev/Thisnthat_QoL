@@ -1,0 +1,15 @@
+## Interface: 120007
+## Title: Thisnthat_KickAssist
+## Notes: Standalone kick coordination and macro helper.
+## Author: Thisnthat
+## Version: 0.1.0
+## SavedVariables: Thisnthat_KickAssistDB
+## OptionalDeps: Blizzard_UIDropDownMenu
+
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+
+Core.lua
+Options.lua

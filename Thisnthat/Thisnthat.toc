@@ -15,5 +15,4 @@ Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 Core.lua
 Modules\Databrokers\DatabrokerPanels.lua
 Modules\PerformanceSettings\PerformanceSettings.lua
-Modules\KickAssist\KickAssist.lua
 Modules\MPlusRewards\MPlusRewards.lua

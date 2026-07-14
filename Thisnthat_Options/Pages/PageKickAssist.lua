@@ -8,8 +8,7 @@ function ns:InitKickAssistPage()
     local parent = ns.OptionsFrame.Content
     local W = ns.OptionsWidgets
     local C = ns.OptionsColors
-    local Addon = (type(ns.GetAddon) == "function" and ns.GetAddon()) or ns.Addon
-    local module = Addon and Addon.GetModule and Addon:GetModule("KickAssist") or nil
+    local standaloneAddon = rawget(_G, "Thisnthat_KickAssist_Addon")
 
     local function ApplyFont(target, offset)
         if W and W.ApplyFont then
@@ -55,10 +54,13 @@ function ns:InitKickAssistPage()
             dialog.edit:SetFontObject(ChatFontNormal)
             dialog.edit:SetTextColor(0.95, 0.95, 0.95, 1)
 
-            dialog.close = CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
-            dialog.close:SetSize(88, 24)
+            dialog.close = W.ActionButton and W.ActionButton(dialog, "Close", 88, 24) or CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
             dialog.close:SetPoint("BOTTOMRIGHT", dialog, "BOTTOMRIGHT", -12, 10)
-            dialog.close:SetText("Close")
+            if dialog.close.lbl then
+                dialog.close.lbl:SetText("Close")
+            else
+                dialog.close:SetText("Close")
+            end
             dialog.close:SetScript("OnClick", function()
                 dialog:Hide()
             end)
@@ -92,7 +94,7 @@ function ns:InitKickAssistPage()
     subtitle:SetPoint("TOPRIGHT", root, "TOPRIGHT", -2, 0)
     subtitle:SetJustifyH("LEFT")
     subtitle:SetWordWrap(true)
-    subtitle:SetText("Pick your kick marker, copy macros, and optionally announce your kick assignment during ready checks in selected dungeon types.")
+    subtitle:SetText("Configure the standalone Thisnthat_KickAssist addon using the shared Thisnthat options interface.")
     ApplyFont(subtitle, -1)
 
     local body = CreateFrame("Frame", nil, root)
@@ -100,9 +102,9 @@ function ns:InitKickAssistPage()
     body:SetPoint("TOPRIGHT", subtitle, "BOTTOMRIGHT", 0, -10)
     body:SetHeight(1)
 
-    if not module then
+    if not standaloneAddon or type(standaloneAddon.GetConfig) ~= "function" then
         local notice = W.Builder(body, { startY = 0, padX = 0 })
-        notice:Desc("|cffff7777KickAssist module is not available.|r")
+        notice:Desc("|cffff7777Thisnthat_KickAssist is not loaded.|r")
         local h = notice:Finalize()
         body:SetHeight(h)
         root:SetHeight(84 + h)
@@ -111,34 +113,37 @@ function ns:InitKickAssistPage()
     end
 
     local function cfg()
-        return module:GetConfig()
+        return standaloneAddon:GetConfig()
     end
 
     local function markerItems()
         local items = {}
-        for _, marker in ipairs(module:GetRaidMarkers()) do
-            local icon = module:GetMarkerTextureTag(marker.index, 14)
+        for _, marker in ipairs(standaloneAddon:GetRaidMarkers()) do
+            local icon = standaloneAddon:GetMarkerTextureTag(marker.index, 14)
             items[#items + 1] = {
                 value = marker.index,
-                label = icon .. " " .. marker.name,
+                label = (icon ~= "" and (icon .. " ") or "") .. marker.name,
             }
         end
         return items
     end
 
     local function focusMacroPreview()
-        return module:BuildFocusMacro(cfg().markerIndex)
+        return standaloneAddon:BuildFocusMacro(cfg().markerIndex)
     end
 
     local function kickMacroPreview()
-        return module:BuildKickMacro()
+        return standaloneAddon:BuildKickMacro()
     end
 
     local function announcementPreview()
-        local markerTexture = module:GetMarkerTextureTag(cfg().markerIndex, 14)
+        local markerTexture = standaloneAddon:GetMarkerTextureTag(cfg().markerIndex, 14)
         local text = cfg().announceTemplate or ""
         if text == "" then
             text = "My Kick target is {RAIDMARKER}"
+        end
+        if markerTexture == "" then
+            return "No ready check message will be sent while marker is set to None."
         end
         return string.gsub(text, "{RAIDMARKER}", markerTexture)
     end
@@ -189,7 +194,7 @@ function ns:InitKickAssistPage()
         markerItems,
         function() return cfg().markerIndex end,
         function(v)
-            cfg().markerIndex = tonumber(v) or 4
+            cfg().markerIndex = tonumber(v) or 0
             ns:InitKickAssistPage()
         end,
         0,
@@ -198,13 +203,22 @@ function ns:InitKickAssistPage()
 
     b:Desc("Your selected marker is used in the focus-mark macro and in the ready-check announcement.")
 
+    b:Header("Minimap Button")
+    b:Toggle("Show minimap button",
+        function()
+            return cfg().hideMinimapButton ~= true
+        end,
+        function(v)
+            cfg().hideMinimapButton = not (v and true or false)
+            if type(standaloneAddon.UpdateMinimapButton) == "function" then
+                standaloneAddon:UpdateMinimapButton()
+            end
+        end)
+
     b:Header("Kick Macro")
     b:Cycle("Interrupt ability",
         function()
-            if module and type(module.GetInterruptSpellChoices) == "function" then
-                return module:GetInterruptSpellChoices()
-            end
-            return { { value = "AUTO", label = "Auto (Class Default)" } }
+            return standaloneAddon:GetInterruptSpellChoices()
         end,
         function()
             return cfg().interruptSpell or "AUTO"
@@ -227,9 +241,7 @@ function ns:InitKickAssistPage()
         end,
         "Create TNT: Kick Macro",
         function()
-            if module and type(module.CreateKickMacro) == "function" then
-                module:CreateKickMacro()
-            end
+            standaloneAddon:CreateKickMacro()
         end
     )
 
@@ -244,9 +256,7 @@ function ns:InitKickAssistPage()
         end,
         "Create TNT: Focus Macro",
         function()
-            if module and type(module.CreateFocusMacro) == "function" then
-                module:CreateFocusMacro()
-            end
+            standaloneAddon:CreateFocusMacro()
         end
     )
 
@@ -291,4 +301,8 @@ function ns:InitKickAssistPage()
     body:SetHeight(h)
     root:SetHeight(84 + h)
     parent:SetHeight(110 + h)
+
+    ns.RefreshCurrentPage = function()
+        ns:InitKickAssistPage()
+    end
 end
