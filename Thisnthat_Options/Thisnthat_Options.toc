@@ -1,9 +1,9 @@
 ## Interface: 120007
-## Title: Thisnthat_QoL_Options
-## Notes: Load-on-demand options UI for Thisnthat_QoL.
+## Title: Thisnthat_Options
+## Notes: Load-on-demand options UI for Thisnthat.
 ## Author: Thisnthat
 ## Version: 0.1.0
-## RequiredDeps: Thisnthat_QoL
+## RequiredDeps: Thisnthat
 ## LoadOnDemand: 1
 
 Bootstrap.lua
@@ -14,5 +14,6 @@ Pages\PageGeneral.lua
 Pages\PageDataBrokers.lua
 Pages\PageDataBrokerPanels.lua
 Pages\PagePerformance.lua
+Pages\PageKickAssist.lua
 Pages\PageMPlusRewards.lua
 Options.lua

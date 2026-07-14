@@ -235,6 +235,8 @@ local moduleEntries = {
             onClick = function() if ns.InitDataBrokerPanelsPage then ns:InitDataBrokerPanelsPage() end end },
         { key = "PerformanceSettings", label = "Performance",
             onClick = function() if ns.InitPerformancePage then ns:InitPerformancePage() end end },
+        { key = "KickAssist", label = "Kick Assist",
+            onClick = function() if ns.InitKickAssistPage then ns:InitKickAssistPage() end end },
         { key = "MPlusRewards", label = "M+ Rewards",
             onClick = function() if ns.InitMPlusRewardsPage then ns:InitMPlusRewardsPage() end end },
 }
@@ -265,13 +267,13 @@ function ns:OpenOptionsTab(tabKey)
     SwitchTab(info.button, info.initFn)
 end
 
-_G.Thisnthat_QoL_OpenOptionsTab = function(tabKey)
+_G.Thisnthat_OpenOptionsTab = function(tabKey)
     if type(ns.OpenOptionsTab) == "function" then
         ns:OpenOptionsTab(tabKey)
     end
 end
 
-_G.Thisnthat_QoL_ShowOptions = function(tabKey)
+_G.Thisnthat_ShowOptions = function(tabKey)
     if ns.OptionsFrame then
         ns.OptionsFrame:Show()
     end

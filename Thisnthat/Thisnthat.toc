@@ -1,10 +1,10 @@
 ## Interface: 120007
-## Title: Thisnthat_QoL
+## Title: Thisnthat
 ## Notes: Modular addon framework with configurable options.
 ## Author: Thisnthat
 ## Version: 0.1.0
-## SavedVariables: Thisnthat_QoLDB
-## OptionalDeps: Thisnthat_SharedMedia, Thisnthat_Databrokers, Thisnthat_QoL_Options, LibSharedMedia-3.0, LibDataBroker-1.1, Ace3, Blizzard_UIDropDownMenu
+## SavedVariables: ThisnthatDB
+## OptionalDeps: Thisnthat_SharedMedia, Thisnthat_Databrokers, Thisnthat_Options, LibSharedMedia-3.0, LibDataBroker-1.1, Ace3, Blizzard_UIDropDownMenu
 
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
@@ -15,4 +15,5 @@ Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 Core.lua
 Modules\Databrokers\DatabrokerPanels.lua
 Modules\PerformanceSettings\PerformanceSettings.lua
+Modules\KickAssist\KickAssist.lua
 Modules\MPlusRewards\MPlusRewards.lua

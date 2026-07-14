@@ -274,4 +274,4 @@ end)
 
 MainWindow.Content = contentChild
 ns.OptionsFrame    = MainWindow
-_G.Thisnthat_QoL_OptionsFrame = MainWindow
+_G.Thisnthat_OptionsFrame = MainWindow

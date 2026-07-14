@@ -1,5 +1,5 @@
-﻿local ADDON_NAME, ns = ...
-local OPTIONS_TITLE = ns.HostAddonName or "Thisnthat_QoL"
+local ADDON_NAME, ns = ...
+local OPTIONS_TITLE = ns.HostAddonName or "Thisnthat"
 
 -- Options.lua: minimal Blizzard interface panel registration.
 -- All settings are handled by the custom window (open with /tnt).
@@ -27,7 +27,7 @@ addonFrame:SetScript("OnEvent", function(_, _, name)
 
         local desc = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-        desc:SetText("Type  /tnt  or  /thisnthat_qol  to open the settings window.")
+        desc:SetText("Type  /tnt  or  /thisnthat  to open the settings window.")
         desc:SetTextColor(0.67, 0.67, 0.67, 1)
         ApplyFont(desc, -1)
 
@@ -36,7 +36,7 @@ addonFrame:SetScript("OnEvent", function(_, _, name)
         btn:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -14)
         btn:SetText("Open " .. OPTIONS_TITLE)
         btn:SetScript("OnClick", function()
-            local showOptions = rawget(_G, "Thisnthat_QoL_ShowOptions")
+            local showOptions = rawget(_G, "Thisnthat_ShowOptions")
             if type(showOptions) == "function" then
                 showOptions("addon_settings")
             elseif ns.OptionsFrame then

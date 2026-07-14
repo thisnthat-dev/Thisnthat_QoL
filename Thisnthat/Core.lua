@@ -1,9 +1,9 @@
 local ADDON_NAME, ns = ...
-local OPTIONS_ADDON_NAME = "Thisnthat_QoL_Options"
+local OPTIONS_ADDON_NAME = "Thisnthat_Options"
 
 local Addon = CreateFrame("Frame")
 ns.Addon = Addon
-_G.Thisnthat_QoL_Addon = Addon
+_G.Thisnthat_Addon = Addon
 
 local GLOBAL_TEXTURE_COLOR = { r = 0.09, g = 0.11, b = 0.14, a = 0.95 }
 local GLOBAL_BORDER_COLOR = { r = 0.18, g = 0.24, b = 0.30, a = 1 }
@@ -23,9 +23,22 @@ local defaults = {
         PerformanceSettings = {
             enabled = true,
         },
+        KickAssist = {
+            enabled = true,
+        },
         MPlusRewards = {
             enabled = true,
         },
+    },
+    KickAssist = {
+        markerIndex = 4,
+        interruptSpell = "AUTO",
+        announceOnReadyCheck = false,
+        announceTemplate = "My Kick target is {RAIDMARKER}",
+        announceInMythicPlus = true,
+        announceInMythicDungeon = false,
+        announceInHeroicDungeon = false,
+        announceInNormalDungeon = false,
     },
     databrokers = {
         unlocked = false,
@@ -235,8 +248,8 @@ function Addon:IsModuleEnabled(name)
 end
 
 local function EnsureDatabase()
-    Thisnthat_QoLDB = type(Thisnthat_QoLDB) == "table" and Thisnthat_QoLDB or {}
-    return Thisnthat_QoLDB
+    ThisnthatDB = type(ThisnthatDB) == "table" and ThisnthatDB or {}
+    return ThisnthatDB
 end
 
 function Addon:InitializeDatabase()
@@ -357,7 +370,7 @@ function Addon:EnableModules()
 end
 
 function Addon:OpenOptions()
-    local showOptions = rawget(_G, "Thisnthat_QoL_ShowOptions")
+    local showOptions = rawget(_G, "Thisnthat_ShowOptions")
     if type(showOptions) == "function" then
         showOptions("addon_settings")
         return
@@ -389,7 +402,7 @@ function Addon:OpenOptions()
         end
     end
 
-    showOptions = rawget(_G, "Thisnthat_QoL_ShowOptions")
+    showOptions = rawget(_G, "Thisnthat_ShowOptions")
     if type(showOptions) == "function" then
         showOptions("addon_settings")
         return
@@ -423,13 +436,12 @@ function Addon:OpenOptions()
     self:Print("No supported options API found.")
 end
 
-SLASH_THISNTHAT_QOL1 = "/thisnthat_qol"
-SLASH_THISNTHAT_QOL2 = "/thisnthat"
-SLASH_THISNTHAT_QOL3 = "/tnt"
+SLASH_THISNTHAT1 = "/thisnthat"
+SLASH_THISNTHAT2 = "/tnt"
 do
     local slashCmdList = rawget(_G, "SlashCmdList")
     if slashCmdList then
-        slashCmdList.THISNTHAT_QOL = function(msg)
+        slashCmdList.THISNTHAT = function(msg)
             local command = string.lower(tostring(msg or ""))
             command = string.gsub(command, "^%s+", "")
             command = string.gsub(command, "%s+$", "")
