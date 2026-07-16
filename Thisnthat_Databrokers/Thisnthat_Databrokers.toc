@@ -16,3 +16,5 @@ Databrokers\TalentLootSpecialization.lua
 Databrokers\System.lua
 Databrokers\Durability.lua
 Databrokers\Clock.lua
+Databrokers\Volume.lua
+Databrokers\AudioDevice.lua

@@ -28,6 +28,18 @@ local BROKER_DEFINITIONS = {
         label = "Specialization",
         description = "Configure specialization broker visibility and icon behavior.",
     },
+    {
+        key = "volumeBroker",
+        name = "TNT: Volume",
+        label = "Volume",
+        description = "Configure volume broker visibility and label settings.",
+    },
+    {
+        key = "audioDeviceBroker",
+        name = "TNT: Audio Device",
+        label = "Audio Device",
+        description = "Configure audio device broker visibility and label settings.",
+    },
 }
 
 local CLOCK_DEFAULTS = {
@@ -181,6 +193,22 @@ local function EnsureSpecializationConfig(db)
     return db.specializationBroker
 end
 
+local function EnsureVolumeConfig(db)
+    db.volumeBroker = type(db.volumeBroker) == "table" and db.volumeBroker or {}
+    db.volumeBroker.enabled = db.volumeBroker.enabled ~= false
+    db.volumeBroker.noLabel = db.volumeBroker.noLabel and true or false
+    db.volumeBroker.customLabel = NormalizeCustomLabel(db.volumeBroker.customLabel)
+    return db.volumeBroker
+end
+
+local function EnsureAudioDeviceConfig(db)
+    db.audioDeviceBroker = type(db.audioDeviceBroker) == "table" and db.audioDeviceBroker or {}
+    db.audioDeviceBroker.enabled = db.audioDeviceBroker.enabled ~= false
+    db.audioDeviceBroker.noLabel = db.audioDeviceBroker.noLabel and true or false
+    db.audioDeviceBroker.customLabel = NormalizeCustomLabel(db.audioDeviceBroker.customLabel)
+    return db.audioDeviceBroker
+end
+
 local function EnsureSelectionDB(Addon)
     local rootDB = GetStandaloneDBRoot()
     local db = rootDB.databrokers
@@ -200,6 +228,8 @@ local function EnsureSelectionDB(Addon)
     EnsureDurabilityConfig(db)
     EnsureSystemConfig(db)
     EnsureSpecializationConfig(db)
+    EnsureVolumeConfig(db)
+    EnsureAudioDeviceConfig(db)
 
     SyncStandaloneAddonDB()
 
@@ -274,6 +304,10 @@ local function GetBrokerConfigForKey(db, key)
         return db.systemBroker
     elseif key == "specializationBroker" then
         return db.specializationBroker
+    elseif key == "volumeBroker" then
+        return db.volumeBroker
+    elseif key == "audioDeviceBroker" then
+        return db.audioDeviceBroker
     end
 
     return nil
@@ -596,6 +630,14 @@ local function BuildSpecializationPanel(builder)
     builder:Desc("Configure the specialization broker label and icon behavior.")
 end
 
+local function BuildVolumePanel(builder)
+    builder:Desc("Volume controls are available directly from the broker menu.")
+end
+
+local function BuildAudioDevicePanel(builder)
+    builder:Desc("Audio output device selection is available directly from the broker menu.")
+end
+
 function ns:InitDataBrokersPage()
     if ns.OptionsFrame and ns.OptionsFrame.ResetContent then
         ns.OptionsFrame:ResetContent()
@@ -677,6 +719,8 @@ function ns:InitDataBrokersPage()
     local durabilityCfg = db.durabilityColors
     local systemCfg = db.systemBroker
     local specializationCfg = db.specializationBroker
+    local volumeCfg = db.volumeBroker
+    local audioDeviceCfg = db.audioDeviceBroker
 
     local panelRowRefs = {}
     local RenderRightPane
@@ -728,6 +772,8 @@ function ns:InitDataBrokersPage()
         durabilityCfg = db.durabilityColors
         systemCfg = db.systemBroker
         specializationCfg = db.specializationBroker
+        volumeCfg = db.volumeBroker
+        audioDeviceCfg = db.audioDeviceBroker
 
         UpdateLeftSelectionVisuals()
         if RenderRightPane then
@@ -900,6 +946,20 @@ function ns:InitDataBrokersPage()
                         specializationCfg.hideLootIconWhenSame = value and true or false
                         RefreshStandaloneBrokers()
                     end)
+            end, true)
+        elseif selectedEntry.key == "volumeBroker" then
+            AddCard("broker_settings", "Broker", function(builder)
+                BuildBrokerSettingsPanel(builder, volumeCfg, RefreshStandaloneBrokers)
+            end, true)
+            AddCard("volume", "Volume", function(builder)
+                BuildVolumePanel(builder)
+            end, true)
+        elseif selectedEntry.key == "audioDeviceBroker" then
+            AddCard("broker_settings", "Broker", function(builder)
+                BuildBrokerSettingsPanel(builder, audioDeviceCfg, RefreshStandaloneBrokers)
+            end, true)
+            AddCard("audio_device", "Audio Device", function(builder)
+                BuildAudioDevicePanel(builder)
             end, true)
         end
 

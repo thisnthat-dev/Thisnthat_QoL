@@ -60,6 +60,16 @@ local defaults = {
             customLabel = "",
             hideLootIconWhenSame = true,
         },
+        volumeBroker = {
+            enabled = true,
+            noLabel = false,
+            customLabel = "",
+        },
+        audioDeviceBroker = {
+            enabled = true,
+            noLabel = false,
+            customLabel = "",
+        },
         options = {
             selectedBrokerKey = "clockBroker",
         },
