@@ -19,6 +19,4 @@ jobs:
         with:
           fetch-depth: 0
       - name: Package and release
-        uses: BigWigsMods/packager@v2
-        with:
-          args: -d Thisnthat_QoL
+        uses: BigWigsMods/packager@v2        
