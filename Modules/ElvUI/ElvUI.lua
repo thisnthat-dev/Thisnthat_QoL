@@ -4,6 +4,7 @@ local Addon = ns.Addon
 local Module = {
     tagsRegistered = false,
     colorCurve = nil,
+    retryQueued = false,
 }
 
 Addon:RegisterModule("ElvUI", Module)
@@ -70,29 +71,61 @@ function Module:RegisterTags()
     end
 
     local E = ResolveElvUIEngine()
-    if not E or type(E.AddTag) ~= "function" then
+    if not E or type(E.oUF) ~= "table" or type(E.oUF.Tags) ~= "table" then
+        return false
+    end
+
+    local Tags = E.oUF.Tags
+    if type(Tags.Methods) ~= "table" or type(Tags.Events) ~= "table" then
         return false
     end
 
     local colorCurve = self:GetColorCurve()
-    if not colorCurve then
-        return false
+
+    local healthColorTag = function(unit)
+        if type(UnitHealthPercent) == "function" and colorCurve then
+            local color = UnitHealthPercent(unit, false, colorCurve)
+            if color and type(color.GenerateHexColorMarkup) == "function" then
+                return color:GenerateHexColorMarkup()
+            end
+        end
+
+        return "|cffffffff"
     end
 
-    E:AddTag("health:percent-curvedcolor", "UNIT_HEALTH_FREQUENT UNIT_MAXHEALTH", function(unit)
-        local color = UnitHealthPercent(unit, false, colorCurve)
-        local value = UnitHealthPercent(unit, false, CurveConstants.ScaleTo100)
-        local text = string.format("%.0f", value)
-        return color and color:WrapTextInColorCode(text) or text
-    end)
+    Tags.Events.healthcolor = "UNIT_HEALTH UNIT_MAXHEALTH"
+    Tags.Methods.healthcolor = healthColorTag
 
-    E:AddTag("healthcolor", "UNIT_HEALTH_FREQUENT UNIT_MAXHEALTH", function(unit)
-        local color = UnitHealthPercent(unit, false, colorCurve)
-        return color and color:GenerateHexColorMarkup() or ""
-    end)
+    if type(Tags.RefreshMethods) == "function" then
+        Tags:RefreshMethods("healthcolor")
+    end
 
     self.tagsRegistered = true
     return true
+end
+
+function Module:QueueRetry()
+    if self.tagsRegistered or self.retryQueued then
+        return
+    end
+
+    if not (C_Timer and type(C_Timer.After) == "function") then
+        return
+    end
+
+    self.retryQueued = true
+    C_Timer.After(1, function()
+        self.retryQueued = false
+        if not self:RegisterTags() then
+            self:QueueRetry()
+        end
+    end)
+end
+
+function Module:OnInitialize()
+    if not self:RegisterTags() then
+        self:QueueRetry()
+    end
 end
 
 function Module:SetEnabled(enabled)
@@ -103,6 +136,7 @@ function Module:SetEnabled(enabled)
         if self:RegisterTags() then
             Addon:Print("ElvUI module enabled.")
         else
+            self:QueueRetry()
             Addon:Print("ElvUI module could not initialize. Ensure ElvUI is loaded.")
         end
     else
@@ -111,5 +145,24 @@ function Module:SetEnabled(enabled)
 end
 
 function Module:OnEnable()
-    self:RegisterTags()
+    if not self:RegisterTags() then
+        self:QueueRetry()
+    end
 end
+
+local bootstrap = CreateFrame("Frame")
+bootstrap:RegisterEvent("PLAYER_LOGIN")
+bootstrap:RegisterEvent("ADDON_LOADED")
+bootstrap:SetScript("OnEvent", function(_, event, loadedName)
+    if Module.tagsRegistered then
+        bootstrap:UnregisterEvent("PLAYER_LOGIN")
+        bootstrap:UnregisterEvent("ADDON_LOADED")
+        return
+    end
+
+    if event == "PLAYER_LOGIN" or loadedName == "ElvUI" then
+        if not Module:RegisterTags() then
+            Module:QueueRetry()
+        end
+    end
+end)

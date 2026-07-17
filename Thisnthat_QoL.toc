@@ -2,7 +2,7 @@
 ## Title: Thisnthat QoL
 ## Notes: Modular quality-of-life addon with integrated options.
 ## Author: Thisnthat
-## Version: 0.1.0
+## Version: 0.1.1
 ## SavedVariables: ThisnthatDB
 ## OptionalDeps: Thisnthat_SharedMedia, Thisnthat_Databrokers, Thisnthat_KickAssist, ElvUI, LibSharedMedia-3.0, LibDataBroker-1.1, Ace3, Blizzard_UIDropDownMenu
 
