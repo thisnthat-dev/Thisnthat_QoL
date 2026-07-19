@@ -185,6 +185,7 @@ function ns:InitKickAssistPage()
         end)
 
         builder:_Attach(row, 30, gap or 4)
+        return left, right
     end
 
     local b = W.Builder(body, { startY = 0, padX = 0 })
@@ -233,30 +234,71 @@ function ns:InitKickAssistPage()
 
     b:Desc("Use this macro for your class interrupt:")
     b:Desc("|cffd7e3ff" .. kickMacroPreview() .. "|r")
-    AddTwoButtonsRow(
+    local kickCreateButton
+    _, kickCreateButton = AddTwoButtonsRow(
         b,
         "Copy Kick Macro Text",
         function()
             ShowCopyDialog("Copy Kick Macro", kickMacroPreview())
         end,
-        "Create TNT: Kick Macro",
+        (type(standaloneAddon.GetKickMacroActionLabel) == "function") and standaloneAddon:GetKickMacroActionLabel() or "Create TNT: Kick Macro",
         function()
             standaloneAddon:CreateKickMacro()
+            local nextLabel = (type(standaloneAddon.GetKickMacroActionLabel) == "function") and standaloneAddon:GetKickMacroActionLabel() or "Update TNT: Kick Macro"
+            if kickCreateButton and kickCreateButton.lbl then
+                kickCreateButton.lbl:SetText(nextLabel)
+            elseif kickCreateButton and type(kickCreateButton.SetText) == "function" then
+                kickCreateButton:SetText(nextLabel)
+            end
         end
     )
 
     b:Header("Focus + Mark Macro")
+    local focusPreviewRow = CreateFrame("Frame", nil, body)
+    local focusPreviewLabel = focusPreviewRow:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    focusPreviewLabel:SetPoint("TOPLEFT", focusPreviewRow, "TOPLEFT", 2, 0)
+    focusPreviewLabel:SetPoint("TOPRIGHT", focusPreviewRow, "TOPRIGHT", -2, 0)
+    focusPreviewLabel:SetTextColor(C.GRAY.r, C.GRAY.g, C.GRAY.b, 0.85)
+    focusPreviewLabel:SetJustifyH("LEFT")
+    focusPreviewLabel:SetWordWrap(true)
+    ApplyFont(focusPreviewLabel, -1)
+
+    local function RefreshFocusMacroPreviewText()
+        focusPreviewLabel:SetText("|cffd7e3ff" .. focusMacroPreview() .. "|r")
+        C_Timer.After(0, function()
+            local h = focusPreviewLabel:GetStringHeight()
+            focusPreviewRow:SetHeight(math.max(18, h + 4))
+        end)
+    end
+
+    b:Toggle("Use @mouseover in Focus + Mark macro",
+        function()
+            return cfg().useMouseoverForFocusMacro ~= false
+        end,
+        function(v)
+            cfg().useMouseoverForFocusMacro = v and true or false
+            RefreshFocusMacroPreviewText()
+        end)
+
     b:Desc("Use this macro to focus and mark your target:")
-    b:Desc("|cffd7e3ff" .. focusMacroPreview() .. "|r")
-    AddTwoButtonsRow(
+    b:_Attach(focusPreviewRow, 18, 4)
+    RefreshFocusMacroPreviewText()
+    local focusCreateButton
+    _, focusCreateButton = AddTwoButtonsRow(
         b,
         "Copy Focus Macro Text",
         function()
             ShowCopyDialog("Copy Focus Macro", focusMacroPreview())
         end,
-        "Create TNT: Focus Macro",
+        (type(standaloneAddon.GetFocusMacroActionLabel) == "function") and standaloneAddon:GetFocusMacroActionLabel() or "Create TNT: Focus Macro",
         function()
             standaloneAddon:CreateFocusMacro()
+            local nextLabel = (type(standaloneAddon.GetFocusMacroActionLabel) == "function") and standaloneAddon:GetFocusMacroActionLabel() or "Update TNT: Focus Macro"
+            if focusCreateButton and focusCreateButton.lbl then
+                focusCreateButton.lbl:SetText(nextLabel)
+            elseif focusCreateButton and type(focusCreateButton.SetText) == "function" then
+                focusCreateButton:SetText(nextLabel)
+            end
         end
     )
 
