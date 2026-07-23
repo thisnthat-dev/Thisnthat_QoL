@@ -20,6 +20,9 @@ local defaults = {
         databrokers = {
             enabled = true,
         },
+        EllesmereUIAbsorb = {
+            enabled = true,
+        },
         PerformanceSettings = {
             enabled = true,
         },

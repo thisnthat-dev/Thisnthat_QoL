@@ -34,6 +34,19 @@ local function IsKickAssistAddonLoaded()
     return false
 end
 
+local function IsResourceBarsAddonLoaded()
+    if C_AddOns and type(C_AddOns.IsAddOnLoaded) == "function" then
+        return C_AddOns.IsAddOnLoaded("EllesmereUIResourceBars") and true or false
+    end
+
+    local isAddOnLoaded = rawget(_G, "IsAddOnLoaded")
+    if type(isAddOnLoaded) == "function" then
+        return isAddOnLoaded("EllesmereUIResourceBars") and true or false
+    end
+
+    return false
+end
+
 local sidebar = CreateFrame("Frame", nil, ns.OptionsFrame, "BackdropTemplate")
 sidebar:SetWidth(178)
 sidebar:SetPoint("TOPLEFT",    ns.OptionsFrame, "TOPLEFT",    1, -1)
@@ -274,6 +287,14 @@ local moduleEntries = {
         { key = "ElvUI", label = "ElvUI",
             onClick = function() if ns.InitElvUIPage then ns:InitElvUIPage() end end },
 }
+
+if IsResourceBarsAddonLoaded() then
+    table.insert(moduleEntries, 2, {
+        key = "EllesmereUIAbsorb",
+        label = "EllesmereUI Absorb",
+        onClick = function() if ns.InitEllesmereUIAbsorbPage then ns:InitEllesmereUIAbsorbPage() end end,
+    })
+end
 
 local addonEntries = {}
 
