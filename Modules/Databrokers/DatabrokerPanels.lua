@@ -181,8 +181,7 @@ local function EnsureBarConfig(index)
     cfg.showBackdrop = cfg.showBackdrop ~= false
     cfg.showBorder = cfg.showBorder ~= false
     cfg.enabled = cfg.enabled ~= false
-    cfg.textJustify = NormalizeJustify(cfg.textJustify, "CENTER")
-    cfg.fontOverride = cfg.fontOverride and true or false
+    cfg.textJustify = NormalizeJustify(cfg.textJustify, "CENTER")    
     cfg.font = type(cfg.font) == "string" and cfg.font or nil
     cfg.fontSize = Clamp(cfg.fontSize, 6, 64, 12)
     cfg.fontOutline = type(cfg.fontOutline) == "string" and string.upper(cfg.fontOutline) or "NONE"
@@ -461,10 +460,9 @@ function Module:CreateNamedBar(name, maxBrokers, initCfg)
         showBorder = src.showBorder ~= false,
         point = NormalizePoint(src.point, "CENTER"),
         relativePoint = NormalizePoint(src.relativePoint, "CENTER"),
-        x = 0,
-        y = 0,
-        textJustify = NormalizeJustify(src.textJustify, "CENTER"),
-        fontOverride = src.fontOverride and true or false,
+        x = Clamp(src.x, -4000, 4000, 0),
+        y = Clamp(src.y, -4000, 4000, 0),
+        textJustify = NormalizeJustify(src.textJustify, "CENTER"),        
         font = type(src.font) == "string" and src.font or nil,
         fontSize = Clamp(src.fontSize, 6, 64, 12),
         fontOutline = type(src.fontOutline) == "string" and string.upper(src.fontOutline) or "NONE",
@@ -652,17 +650,14 @@ function Module:RefreshBars()
                     buttonWidth = buttonWidth + remainingWidth
                 end
 
-                local buttonFontPath = fontPath
-                local buttonFontSize = fontSize
+                local buttonFontPath = fontPath                
+                if LSM and cfg.font and cfg.font ~= "" then
+                    buttonFontPath = LSM:Fetch("font", cfg.font, true) or buttonFontPath
+                end
+                local buttonFontSize = Clamp(cfg.fontSize, 6, 64, fontSize)
                 local buttonFontFlags = ""
-                if cfg.fontOverride then
-                    if LSM and cfg.font then
-                        buttonFontPath = LSM:Fetch("font", cfg.font, true) or buttonFontPath
-                    end
-                    buttonFontSize = Clamp(cfg.fontSize, 6, 64, buttonFontSize)
-                    if cfg.fontOutline and cfg.fontOutline ~= "NONE" then
-                        buttonFontFlags = cfg.fontOutline
-                    end
+                if cfg.fontOutline and cfg.fontOutline ~= "NONE" then
+                    buttonFontFlags = cfg.fontOutline
                 end
 
                 if dataObject then

@@ -55,9 +55,27 @@ local function Trim(value)
     return (s:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
-local function EnsureDraftConfig(db)
+local function GetDefaultPanelFontConfig(Addon)
+    local fallbackFont = ""
+    local fallbackSize = 12
+
+    if Addon and type(Addon.GetResolvedMediaConfig) == "function" then
+        local media = Addon:GetResolvedMediaConfig("databrokers") or {}
+        fallbackFont = type(media.font) == "string" and media.font or ""
+        fallbackSize = Clamp(media.fontSize, 6, 64, 12)
+    elseif Addon and type(Addon.GetModuleMediaConfig) == "function" then
+        local media = Addon:GetModuleMediaConfig("databrokers") or {}
+        fallbackFont = type(media.font) == "string" and media.font or ""
+        fallbackSize = Clamp(media.fontSize, 6, 64, 12)
+    end
+
+    return fallbackFont, fallbackSize
+end
+
+local function EnsureDraftConfig(db, Addon)
     db.newPanelDraft = type(db.newPanelDraft) == "table" and db.newPanelDraft or {}
     local draft = db.newPanelDraft
+    local defaultFont, defaultFontSize = GetDefaultPanelFontConfig(Addon)
 
     draft.name = type(draft.name) == "string" and draft.name or ""
     draft.maxBrokers = Clamp(draft.maxBrokers, 1, 10, 8)
@@ -78,9 +96,8 @@ local function EnsureDraftConfig(db)
         draft.textJustify = "CENTER"
     end
 
-    draft.fontOverride = draft.fontOverride and true or false
-    draft.font = type(draft.font) == "string" and draft.font or ""
-    draft.fontSize = Clamp(draft.fontSize, 6, 64, 12)
+    draft.font = type(draft.font) == "string" and draft.font or defaultFont
+    draft.fontSize = Clamp(draft.fontSize, 6, 64, defaultFontSize)
     draft.fontOutline = type(draft.fontOutline) == "string" and string.upper(draft.fontOutline) or "NONE"
     if draft.fontOutline ~= "NONE" and draft.fontOutline ~= "OUTLINE" and draft.fontOutline ~= "THICKOUTLINE" and draft.fontOutline ~= "MONOCHROME" then
         draft.fontOutline = "NONE"
@@ -91,6 +108,7 @@ local function EnsureDraftConfig(db)
 
     draft.frameStrata = type(draft.frameStrata) == "string" and string.upper(draft.frameStrata) or "LOW"
     draft.frameLevel = Clamp(draft.frameLevel, 1, 10, 1)
+    draft.brokers = type(draft.brokers) == "table" and draft.brokers or {}
 
     return draft
 end
@@ -116,8 +134,7 @@ local function EnsurePanelConfig(cfg, index)
     if cfg.textJustify ~= "LEFT" and cfg.textJustify ~= "CENTER" and cfg.textJustify ~= "RIGHT" then
         cfg.textJustify = "CENTER"
     end
-
-    cfg.fontOverride = cfg.fontOverride and true or false
+    
     cfg.font = type(cfg.font) == "string" and cfg.font or ""
     cfg.fontSize = Clamp(cfg.fontSize, 6, 64, 12)
     cfg.fontOutline = type(cfg.fontOutline) == "string" and string.upper(cfg.fontOutline) or "NONE"
@@ -154,7 +171,7 @@ local function GetDataBrokerDB(Addon)
     end
     db.panelSectionState = type(db.panelSectionState) == "table" and db.panelSectionState or {}
 
-    EnsureDraftConfig(db)
+    EnsureDraftConfig(db, Addon)
 
     return db
 end
@@ -846,6 +863,31 @@ function ns:InitDataBrokerPanelsPage()
                 BuildStrataSubpanel(b, draftCfg, false)
             end, true)
         elseif selectedCfg then
+            AddSubPanel("panel", "Panel", function(b)
+                b:Input("Name",
+                    function()
+                        return selectedCfg.name or ("Panel " .. tostring(selectedIndex or ""))
+                    end,
+                    function(v)
+                        local cleanName = Trim(v)
+                        if cleanName == "" then
+                            cleanName = "Panel " .. tostring(selectedIndex or 1)
+                        end
+                        selectedCfg.name = cleanName
+                        applyPanels()
+                        refreshPage()
+                    end)
+
+                b:Button("Delete", function()
+                    if type(dbModule.DeleteBar) == "function" and selectedIndex then
+                        dbModule:DeleteBar(selectedIndex)
+                        db.selectedPanelKey = "new"
+                        db.selectedEntityKey = "new"
+                        selectedKey = "new"
+                        refreshPage()
+                    end
+                end)
+            end, true)
             AddSubPanel("databrokers", "DataBrokers", function(b)
                 for slot = 1, selectedCfg.maxBrokers do
                     b:Cycle("DataBroker " .. tostring(slot),
@@ -922,6 +964,8 @@ function ns:InitDataBrokerPanelsPage()
     end
 
     BuildSizeSubpanel = function(b, cfg, applyNow)
+        cfg.brokers = type(cfg.brokers) == "table" and cfg.brokers or {}
+
         b:Range("Number of DataBrokers", 1, 10, 1,
             function()
                 return cfg.maxBrokers
@@ -1190,14 +1234,6 @@ function ns:InitDataBrokerPanelsPage()
     end
 
     BuildFontSubpanel = function(b, cfg, applyNow)
-        b:Toggle("Override",
-            function() return cfg.fontOverride end,
-            function(v)
-                cfg.fontOverride = v and true or false
-                if applyNow then
-                    applyPanels()
-                end
-            end)
 
         b:Cycle("Font",
             function() return fontItems end,
