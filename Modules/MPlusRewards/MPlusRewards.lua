@@ -30,32 +30,24 @@ local COLORS = {
     myth = "ff8000",
 }
 
-local ILEVEL_RANGE = {
+local ILEVEL_RANGE_12_1 = {
+    champion = { 292, 295, 298, 302, 305, 308 },
+    hero = { 305, 308, 311, 315, 318, 321 },
+    myth = { 318, 321, 324, 328, 331, 334 },
+}
+
+local ILEVEL_RANGE_12_0 = {
     champion = { 246, 250, 253, 256, 259, 263 },
     hero = { 259, 263, 266, 269, 272, 276 },
     myth = { 272, 276, 279, 282, 285, 289 },
 }
 
-local TRACK = {
-    champion = { short = "C", name = "Champion", color = COLORS.champion, range = ILEVEL_RANGE.champion },
-    hero = { short = "H", name = "Hero", color = COLORS.hero, range = ILEVEL_RANGE.hero },
-    myth = { short = "M", name = "Myth", color = COLORS.myth, range = ILEVEL_RANGE.myth },
-}
+local ILEVEL_RANGE_LATEST = ILEVEL_RANGE_12_1
 
-local KEY_REWARDS = {
-    [1] = { loot = { track = TRACK.champion, value = 246 }, vault = { track = TRACK.champion, value = 256 }, crests = { track = TRACK.champion, value = 8 } },
-    [2] = { loot = { track = TRACK.champion, value = 250 }, vault = { track = TRACK.champion, value = 259 }, crests = { track = TRACK.champion, value = 10 } },
-    [3] = { loot = { track = TRACK.champion, value = 250 }, vault = { track = TRACK.champion, value = 259 }, crests = { track = TRACK.champion, value = 12 } },
-    [4] = { loot = { track = TRACK.champion, value = 253 }, vault = { track = TRACK.hero, value = 263 }, crests = { track = TRACK.hero, value = 10 } },
-    [5] = { loot = { track = TRACK.champion, value = 256 }, vault = { track = TRACK.hero, value = 263 }, crests = { track = TRACK.hero, value = 12 } },
-    [6] = { loot = { track = TRACK.champion, value = 259 }, vault = { track = TRACK.hero, value = 266 }, crests = { track = TRACK.hero, value = 14 } },
-    [7] = { loot = { track = TRACK.champion, value = 259 }, vault = { track = TRACK.hero, value = 269 }, crests = { track = TRACK.hero, value = 16 } },
-    [8] = { loot = { track = TRACK.champion, value = 263 }, vault = { track = TRACK.hero, value = 269 }, crests = { track = TRACK.hero, value = 18 } },
-    [9] = { loot = { track = TRACK.champion, value = 263 }, vault = { track = TRACK.hero, value = 269 }, crests = { track = TRACK.myth, value = 10 } },
-    [10] = { loot = { track = TRACK.hero, value = 266 }, vault = { track = TRACK.myth, value = 272 }, crests = { track = TRACK.myth, value = 12 } },
-    [11] = { loot = { track = TRACK.hero, value = 266 }, vault = { track = TRACK.myth, value = 272 }, crests = { track = TRACK.myth, value = 14 } },
-    [12] = { loot = { track = TRACK.hero, value = 266 }, vault = { track = TRACK.myth, value = 272 }, crests = { track = TRACK.myth, value = 16 } },
-}
+local TRACKS = {}
+local KEY_REWARDS = {}
+local ILEVEL_RANGE = {}
+
 
 local AFFIX_RULES = {
     [1] = { min = 2, maxExclusive = 6 },
@@ -178,6 +170,16 @@ local function GetAffixStatusLines()
         local affixName
         if C_ChallengeMode and type(C_ChallengeMode.GetAffixInfo) == "function" and affixID then
             affixName = C_ChallengeMode.GetAffixInfo(affixID)
+
+            if affixID == 148 then
+                affixName = affixName .. " (CC Orbs)"
+            elseif affixID == 158 then
+                affixName = affixName .. " (Kill Add)"
+            elseif affixID == 160 then
+                affixName = affixName .. " (Dispell)"
+            elseif affixID == 162 then
+                affixName = affixName .. " (Rotating Orbs)"
+            end
         end
 
         affixName = (type(affixName) == "string" and affixName ~= "") and affixName or ("Affix " .. tostring(affixID or i))
@@ -218,6 +220,39 @@ local function GetDB()
     db.borderColor = NormalizeColor(db.borderColor, 0.31, 0.30, 0.30, 0.85)
 
     return db
+end
+
+local function buildKeyRewards()
+    local patchVersion = select(1, GetBuildInfo())
+
+    if patchVersion == "12.0.5" or patchVersion == "12.0.7" then
+        ILEVEL_RANGE = ILEVEL_RANGE_12_0
+    elseif patchVersion == "12.1.0" or patchVersion == "12.1.5" or patchVersion == "12.1.7" then
+        ILEVEL_RANGE = ILEVEL_RANGE_12_1
+    else
+        ILEVEL_RANGE = ILEVEL_RANGE_LATEST
+    end
+
+    TRACKS = {
+        champion = { short = "C", name = "Champion", color = COLORS.champion, range = ILEVEL_RANGE.champion },
+        hero = { short = "H", name = "Hero", color = COLORS.hero, range = ILEVEL_RANGE.hero },
+        myth = { short = "M", name = "Myth", color = COLORS.myth, range = ILEVEL_RANGE.myth },
+    }
+
+    KEY_REWARDS = {
+        [1] = { loot = { track = TRACKS.champion, value = TRACKS.champion.range[1] }, vault = { track = TRACKS.champion, value = TRACKS.champion.range[4] }, crests = { track = TRACKS.champion, value = 8 } },
+        [2] = { loot = { track = TRACKS.champion, value = TRACKS.champion.range[2] }, vault = { track = TRACKS.hero, value = TRACKS.hero.range[1] }, crests = { track = TRACKS.champion, value = 10 } },
+        [3] = { loot = { track = TRACKS.champion, value = TRACKS.champion.range[2] }, vault = { track = TRACKS.hero, value = TRACKS.hero.range[1] }, crests = { track = TRACKS.champion, value = 12 } },
+        [4] = { loot = { track = TRACKS.champion, value = TRACKS.champion.range[3] }, vault = { track = TRACKS.hero, value = TRACKS.hero.range[2] }, crests = { track = TRACKS.hero, value = 10 } },
+        [5] = { loot = { track = TRACKS.champion, value = TRACKS.champion.range[4] }, vault = { track = TRACKS.hero, value = TRACKS.hero.range[2] }, crests = { track = TRACKS.hero, value = 12 } },
+        [6] = { loot = { track = TRACKS.hero, value = TRACKS.hero.range[1] }, vault = { track = TRACKS.hero, value = TRACKS.hero.range[3] }, crests = { track = TRACKS.hero, value = 14 } },
+        [7] = { loot = { track = TRACKS.hero, value = TRACKS.hero.range[1] }, vault = { track = TRACKS.hero, value = TRACKS.hero.range[4] }, crests = { track = TRACKS.hero, value = 16 } },
+        [8] = { loot = { track = TRACKS.hero, value = TRACKS.hero.range[2] }, vault = { track = TRACKS.hero, value = TRACKS.hero.range[4] }, crests = { track = TRACKS.hero, value = 18 } },
+        [9] = { loot = { track = TRACKS.hero, value = TRACKS.hero.range[2] }, vault = { track = TRACKS.hero, value = TRACKS.hero.range[4] }, crests = { track = TRACKS.myth, value = 10 } },
+        [10] = { loot = { track = TRACKS.hero, value = TRACKS.hero.range[3] }, vault = { track = TRACKS.myth, value = TRACKS.myth.range[1] }, crests = { track = TRACKS.myth, value = 12 } },
+        [11] = { loot = { track = TRACKS.hero, value = TRACKS.hero.range[3] }, vault = { track = TRACKS.myth, value = TRACKS.myth.range[1] }, crests = { track = TRACKS.myth, value = 14 } },
+        [12] = { loot = { track = TRACKS.hero, value = TRACKS.hero.range[3] }, vault = { track = TRACKS.myth, value = TRACKS.myth.range[1] }, crests = { track = TRACKS.myth, value = 16 } },
+    }
 end
 
 function Module:GetRank(keyReward)
@@ -519,6 +554,7 @@ end
 
 function Module:OnInitialize()
     GetDB()
+    buildKeyRewards()
 end
 
 function Module:OnEnable()
