@@ -29,6 +29,9 @@ local defaults = {
         MPlusRewards = {
             enabled = true,
         },
+        Macros = {
+            enabled = true,
+        },
         ElvUI = {},
     },
     databrokers = {
@@ -61,6 +64,49 @@ local defaults = {
             fontSize = 12,
             textureColor = nil,
             borderColor = nil,
+        },
+    },
+    macros = {
+        sectionState = {},
+        flask = {
+            enabled = true,
+            macroName = "TNT: Flask",
+            roleDefaults = {
+                TANK = "VERSATILITY",
+                HEALER = "MASTERY",
+                MELEE = "HASTE",
+                RANGED = "CRIT",
+            },
+            specOverrides = {},
+        },
+        healingPotion = {
+            enabled = true,
+            macroName = "TNT: Healing Potion",
+            useSoulburnForHealthstone = false,
+            useRecuperateOutOfCombat = false,
+            enableHealthstones = true,
+            enableHealingPotions = true,
+            addStopCast = false,
+            prioritizeHealingPotions = false,
+        },
+        combatPotion = {
+            enabled = true,
+            macroName = "TNT: Combat Potion",
+            roleDefaults = {
+                TANK = "LIGHTS_POTENTIAL",
+                HEALER = "LIGHTS_POTENTIAL",
+                MELEE = "RECKLESSNESS",
+                RANGED = "LIGHTS_POTENTIAL",
+            },
+            specOverrides = {},
+        },
+        food = {
+            macroName = "TNT: Food",
+        },
+        drink = {
+            enabled = true,
+            macroName = "TNT: Drink",
+            order = { "TEA", "MAGE_FOOD", "WATER" },
         },
     },
 }

@@ -280,6 +280,8 @@ CreateGroup("general", "General", {
 local moduleEntries = {
         { key = "DatabrokerPanels",  label = "DataBroker Panels",
             onClick = function() if ns.InitDataBrokerPanelsPage then ns:InitDataBrokerPanelsPage() end end },
+        { key = "Macros", label = "Macros",
+            onClick = function() if ns.InitMacrosPage then ns:InitMacrosPage() end end },
         { key = "PerformanceSettings", label = "Performance",
             onClick = function() if ns.InitPerformancePage then ns:InitPerformancePage() end end },
         { key = "MPlusRewards", label = "M+ Rewards",
