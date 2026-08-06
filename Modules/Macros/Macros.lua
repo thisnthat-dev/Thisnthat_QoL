@@ -220,8 +220,8 @@ local function GetItemCooldownRemaining(itemID)
         end
     end
 
-    if type(GetItemCooldown) == "function" then
-        local startTime, duration, enableValue = GetItemCooldown(itemID)
+    if type(C_Item.GetItemCooldown) == "function" then
+        local startTime, duration, enableValue = C_Item.GetItemCooldown(itemID)
         startTime = tonumber(startTime) or 0
         duration = tonumber(duration) or 0
         if tonumber(enableValue) == 0 then
@@ -414,19 +414,19 @@ local function IsPlayerWarlock()
 end
 
 local function PlayerKnowsSoulburn()
-    if type(IsPlayerSpell) ~= "function" then
+    if type(C_SpellBook.IsSpellKnown) ~= "function" then
         return false
     end
-    return IsPlayerSpell(SOULBURN_SPELL_ID) and true or false
+    return C_SpellBook.IsSpellKnown(SOULBURN_SPELL_ID) and true or false
 end
 
 local function PlayerKnowsSpell(spellID)
-    if C_SpellBook and type(C_SpellBook.IsSpellKnown) == "function" then
-        return C_SpellBook.IsSpellKnown(spellID) and true or false
+    if C_SpellBook and type(C_SpellBook.IsSpellInSpellBook) == "function" then
+        return C_SpellBook.IsSpellInSpellBook(spellID) and true or false
     end
 
-    if type(IsPlayerSpell) == "function" then
-        return IsPlayerSpell(spellID) and true or false
+    if type(C_SpellBook.IsSpellKnown) == "function" then
+        return C_SpellBook.IsSpellKnown(spellID) and true or false
     end
 
     return false
@@ -479,7 +479,7 @@ function Module:GetSpecCatalog()
         local className, classFile, classID = GetClassInfo(classIndex)
         classID = tonumber(classID)
         if classID then
-            local specCount = type(GetNumSpecializationsForClassID) == "function" and tonumber(GetNumSpecializationsForClassID(classID)) or 0
+            local specCount = type(C_SpecializationInfo.GetNumSpecializationsForClassID) == "function" and tonumber(C_SpecializationInfo.GetNumSpecializationsForClassID(classID)) or 0
             for specIndex = 1, specCount do
                 local specID, specName = GetSpecializationInfoForClassID(classID, specIndex)
                 specID = tonumber(specID)
@@ -709,7 +709,7 @@ function Module:FindBestCombatPotionForChoice(choiceKey)
             if itemID and stackCount > 0 and not availableByID[itemID] then
                 availableByID[itemID] = {
                     itemID = itemID,
-                    itemName = GetItemInfo(itemID),
+                    itemName = C_Item.GetItemInfo(itemID),
                 }
             end
         end
@@ -738,7 +738,7 @@ function Module:GetAvailableItemsByID()
             if itemID and stackCount > 0 and not availableByID[itemID] then
                 availableByID[itemID] = {
                     itemID = itemID,
-                    itemName = GetItemInfo(itemID),
+                    itemName = C_Item.GetItemInfo(itemID),
                     stackCount = stackCount,
                 }
             end
@@ -1024,7 +1024,7 @@ function Module:FindBestFlaskForStat(statKey)
                 if itemID and stackCount > 0 and not availableByID[itemID] then
                     availableByID[itemID] = {
                         itemID = itemID,
-                        itemName = GetItemInfo(itemID),
+                        itemName = C_Item.GetItemInfo(itemID),
                     }
                 end
             end
@@ -1047,14 +1047,14 @@ function Module:FindBestFlaskForStat(statKey)
         for slotID = 1, slotCount do
             local info = ResolveBagItemInfo(bagID, slotID)
             if info and info.itemID and (tonumber(info.stackCount) or 0) > 0 then
-                local itemName = GetItemInfo(info.itemID)
+                local itemName = C_Item.GetItemInfo(info.itemID)
                 local detectedStat = self:ResolveStatFromItem(info.itemID, itemName)
                 if detectedStat == statKey then
                     local lowered = string.lower(itemName or "")
                     local isFleeting = FindKeyword(lowered, "fleeting")
                     local quality = tonumber(info.quality)
                     if not quality then
-                        quality = tonumber(select(3, GetItemInfo(info.itemID)))
+                        quality = tonumber(select(3, C_Item.GetItemInfo(info.itemID)))
                     end
                     local isRankTwo = (quality or 0) >= 2
 
@@ -1157,8 +1157,7 @@ function Module:BuildHealingPotionMacroText()
     local lines = {}
 
     if chosen and chosen.sourceType == "spell" and chosen.spellID then
-        local spellName = chosen.displayName or GetSpellDisplayName(chosen.spellID, "Recuperate")
-        lines[#lines + 1] = "#showtooltip " .. tostring(spellName)
+        lines[#lines + 1] = "#showtooltip spell:" .. tostring(chosen.spellID)
     elseif chosen and chosen.itemID then
         lines[#lines + 1] = "#showtooltip item:" .. tostring(chosen.itemID)
     else
