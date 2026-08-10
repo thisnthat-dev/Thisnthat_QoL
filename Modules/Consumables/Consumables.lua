@@ -84,11 +84,6 @@ local COMBAT_POTION_ITEMS = {
     },
 }
 
-local DEFAULT_COMBAT_POTION_TYPE_BY_SPEC = {
-    [64] = "recklessness",
-    [1480] = "recklessness",
-}
-
 local FLASK_TYPES = {
     crit = 1,
     haste = 2,
@@ -108,17 +103,6 @@ local FLASK_TYPE_LABELS = {
     haste = "Haste",
     mastery = "Mastery",
     versatility = "Versatility",
-}
-
-local DEFAULT_FLASK_TYPE_BY_SPEC = {
-    [581] = "haste",
-    [577] = "crit",
-    [1480] = "mastery",
-    [250] = "crit",
-    [251] = "crit",
-    [252] = "haste",
-    [104] = "haste",
-    [268] = "crit",
 }
 
 local FLASK_ITEMS = {
@@ -436,6 +420,8 @@ function Module:GetConfig()
     local cfg = Addon.db.Consumables
 
     cfg.enabled = cfg.enabled ~= false
+    cfg.hideInCombat = cfg.hideInCombat and true or false
+    cfg.hideInEncounter = cfg.hideInEncounter and true or false
     cfg.customAnchor = cfg.customAnchor and true or false
     cfg.anchorPanel = type(cfg.anchorPanel) == "string" and Trim(cfg.anchorPanel) or "UIParent"
     if cfg.anchorPanel == "" then
@@ -474,20 +460,12 @@ function Module:GetConfig()
     cfg.flask.defaultType = NormalizeFlaskType(cfg.flask.defaultType, "crit")
     cfg.flask.specOverrides = type(cfg.flask.specOverrides) == "table" and cfg.flask.specOverrides or {}
 
-    local hasAnyOverride = false
     for specID, value in pairs(cfg.flask.specOverrides) do
         local normalized = NormalizeFlaskType(value, "default")
         if normalized == "default" then
             cfg.flask.specOverrides[specID] = nil
         else
             cfg.flask.specOverrides[specID] = normalized
-            hasAnyOverride = true
-        end
-    end
-
-    if not hasAnyOverride then
-        for specID, typeKey in pairs(DEFAULT_FLASK_TYPE_BY_SPEC) do
-            cfg.flask.specOverrides[tostring(specID)] = NormalizeFlaskType(typeKey, "crit")
         end
     end
 
@@ -495,20 +473,12 @@ function Module:GetConfig()
     cfg.combatPotion.defaultType = NormalizeCombatPotionType(cfg.combatPotion.defaultType, "lights_potential")
     cfg.combatPotion.specOverrides = type(cfg.combatPotion.specOverrides) == "table" and cfg.combatPotion.specOverrides or {}
 
-    local hasAnyCombatOverride = false
     for specID, value in pairs(cfg.combatPotion.specOverrides) do
         local normalized = NormalizeCombatPotionType(value, "default")
         if normalized == "default" then
             cfg.combatPotion.specOverrides[specID] = nil
         else
             cfg.combatPotion.specOverrides[specID] = normalized
-            hasAnyCombatOverride = true
-        end
-    end
-
-    if not hasAnyCombatOverride then
-        for specID, typeKey in pairs(DEFAULT_COMBAT_POTION_TYPE_BY_SPEC) do
-            cfg.combatPotion.specOverrides[tostring(specID)] = NormalizeCombatPotionType(typeKey, "lights_potential")
         end
     end
 
@@ -531,6 +501,46 @@ function Module:GetConfig()
     end
 
     return cfg
+end
+
+local function IsPlayerInCombat()
+    local inCombatLockdown = rawget(_G, "InCombatLockdown")
+    if type(inCombatLockdown) == "function" then
+        return inCombatLockdown() and true or false
+    end
+
+    local unitAffectingCombat = rawget(_G, "UnitAffectingCombat")
+    if type(unitAffectingCombat) == "function" then
+        return unitAffectingCombat("player") and true or false
+    end
+
+    return false
+end
+
+local function IsEncounterActive()
+    local isEncounterInProgress = rawget(_G, "IsEncounterInProgress")
+    if type(isEncounterInProgress) == "function" then
+        return isEncounterInProgress() and true or false
+    end
+
+    return false
+end
+
+function Module:ShouldShowFrame()
+    local cfg = self:GetConfig()
+    if cfg.enabled == false then
+        return false
+    end
+
+    if cfg.hideInEncounter and (self.inEncounter or IsEncounterActive()) then
+        return false
+    end
+
+    if cfg.hideInCombat and IsPlayerInCombat() then
+        return false
+    end
+
+    return true
 end
 
 function Module:GetAlertConfig(sectionKey)
@@ -881,7 +891,8 @@ function Module:CreateFrame()
         self:ApplyBorderState(iconFrame, false)
 
         local icon = iconFrame:CreateTexture(nil, "ARTWORK")
-        icon:SetAllPoints(iconFrame)
+        icon:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", 1, -1)
+        icon:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", -1, 1)
         icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
         local count = iconFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -896,12 +907,12 @@ function Module:CreateFrame()
         quality:SetPoint("TOPRIGHT", iconFrame, "TOPRIGHT", 6, 6)
 
         local alertBorder = CreateFrame("Frame", nil, iconFrame, "BackdropTemplate")
-        alertBorder:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", -2, 2)
-        alertBorder:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", 2, -2)
+        alertBorder:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", 0, 0)
+        alertBorder:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", 0, 0)
         alertBorder:SetFrameLevel(iconFrame:GetFrameLevel() + 6)
         alertBorder:SetBackdrop({
             edgeFile = "Interface\\Buttons\\WHITE8X8",
-            edgeSize = 2,
+            edgeSize = 1,
         })
         alertBorder:SetBackdropBorderColor(ALERT_BORDER_COLOR.r, ALERT_BORDER_COLOR.g, ALERT_BORDER_COLOR.b, ALERT_BORDER_COLOR.a)
         alertBorder:Hide()
@@ -1077,7 +1088,6 @@ function Module:ApplyAnchor()
 end
 
 function Module:Refresh()
-    local cfg = self:GetConfig()
     local frame = self:CreateFrame()
     if not frame then
         return
@@ -1085,17 +1095,32 @@ function Module:Refresh()
 
     self:ApplyLayout()
     self:ApplyAnchor()
-    frame:SetShown(cfg.enabled ~= false)
+    frame:SetShown(self:ShouldShowFrame())
 end
 
 function Module:HandleEvent(event, ...)
-    if event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_SPECIALIZATION_CHANGED" or event == "BAG_UPDATE" then
+    if event == "ENCOUNTER_START" then
+        self.inEncounter = true
+    elseif event == "ENCOUNTER_END" then
+        self.inEncounter = false
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        self.inEncounter = IsEncounterActive()
+    end
+
+    if event == "PLAYER_ENTERING_WORLD"
+        or event == "PLAYER_SPECIALIZATION_CHANGED"
+        or event == "BAG_UPDATE"
+        or event == "PLAYER_REGEN_DISABLED"
+        or event == "PLAYER_REGEN_ENABLED"
+        or event == "ENCOUNTER_START"
+        or event == "ENCOUNTER_END" then
         self:Refresh()
     end
 end
 
 function Module:OnInitialize()
     self:GetConfig()
+    self.inEncounter = IsEncounterActive()
     self:CreateFrame()
 end
 
@@ -1110,6 +1135,10 @@ function Module:OnEnable()
     self.eventFrame:RegisterEvent("BAG_UPDATE")
     self.eventFrame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
     self.eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    self.eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+    self.eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+    self.eventFrame:RegisterEvent("ENCOUNTER_START")
+    self.eventFrame:RegisterEvent("ENCOUNTER_END")
 
     self:Refresh()
 end

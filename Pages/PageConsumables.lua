@@ -188,6 +188,8 @@ local function GetConsumablesConfig(Addon)
     local fallbackFont, fallbackSize = GetDefaultFontConfig(Addon)
 
     cfg.enabled = cfg.enabled ~= false
+    cfg.hideInCombat = cfg.hideInCombat and true or false
+    cfg.hideInEncounter = cfg.hideInEncounter and true or false
     cfg.selectedSectionKey = type(cfg.selectedSectionKey) == "string" and cfg.selectedSectionKey or "global"
     if SECTION_LABELS[cfg.selectedSectionKey] == nil then
         cfg.selectedSectionKey = "global"
@@ -738,6 +740,32 @@ function ns:InitConsumablesPage()
         b:_Attach(offsetRow, 34, 4)
     end
 
+    local function BuildVisibilitySubpanel(b, panelCfg, applyNow)
+        b:Desc("When both options are enabled, encounter visibility takes priority over combat visibility.")
+
+        b:Toggle("Hide in combat",
+            function()
+                return panelCfg.hideInCombat and true or false
+            end,
+            function(value)
+                panelCfg.hideInCombat = value and true or false
+                if applyNow then
+                    refreshModule()
+                end
+            end)
+
+        b:Toggle("Hide in encounter",
+            function()
+                return panelCfg.hideInEncounter and true or false
+            end,
+            function(value)
+                panelCfg.hideInEncounter = value and true or false
+                if applyNow then
+                    refreshModule()
+                end
+            end)
+    end
+
     local function BuildFontSubpanel(b, panelCfg, applyNow)
         local fontItems = MakeFontItems(LSM)
 
@@ -1116,6 +1144,10 @@ function ns:InitConsumablesPage()
         if selectedKey == "global" then
             AddSubPanel("position", "Position", function(b)
                 BuildPositionSubpanel(b, cfg, true)
+            end, true)
+
+            AddSubPanel("visibility", "Visibility", function(b)
+                BuildVisibilitySubpanel(b, cfg, true)
             end, true)
 
             AddSubPanel("font", "Font", function(b)

@@ -34,6 +34,8 @@ local defaults = {
         },
         Consumables = {
             enabled = true,
+            hideInCombat = false,
+            hideInEncounter = false,
             tracking = {
                 healthPotion = true,
                 combatPotion = true,
