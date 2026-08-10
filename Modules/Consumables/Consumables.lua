@@ -458,7 +458,7 @@ function Module:GetConfig()
     cfg.iconWidth = Clamp(cfg.iconWidth, 16, 128, 36)
     cfg.iconHeight = Clamp(cfg.iconHeight, 16, 128, 36)
     cfg.iconGap = Clamp(cfg.iconGap, 0, 32, 4)
-    cfg.qualitySize = Clamp(cfg.qualitySize, 8, 48, 12)
+    cfg.qualitySize = Clamp(cfg.qualitySize, 8, 48, 28)
     cfg.battleRes = type(cfg.battleRes) == "table" and cfg.battleRes or {}
     cfg.battleRes.disableIfClassHasSpell = cfg.battleRes.disableIfClassHasSpell and true or false
     cfg.tracking = type(cfg.tracking) == "table" and cfg.tracking or {}
