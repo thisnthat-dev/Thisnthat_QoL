@@ -275,6 +275,8 @@ end
 CreateGroup("general", "General", {
     { key = "addon_settings", label = "Addon Settings",
       onClick = function() if ns.InitGeneralPage     then ns:InitGeneralPage()     end end },
+        { key = "profiles", label = "Profiles",
+            onClick = function() if ns.InitProfilesPage    then ns:InitProfilesPage()    end end },
 })
 
 local moduleEntries = {

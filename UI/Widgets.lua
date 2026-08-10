@@ -214,7 +214,7 @@ function W.Builder(parent, opts)
     end
 
     -- Execute button (full-width row with a right-aligned button)
-    function b:Button(label, fn, gap)
+    function b:Button(label, fn, gap, buttonWidth, buttonHeight)
         local f = CreateFrame("Frame", nil, parent, "BackdropTemplate")
         f:SetHeight(30)
         RowBG(f)
@@ -226,7 +226,7 @@ function W.Builder(parent, opts)
         W.ApplyFont(lbl, -1)
 
         local btn = CreateFrame("Button", nil, f, "BackdropTemplate")
-        StyleActionButton(btn, 180, 22)
+        StyleActionButton(btn, buttonWidth or 180, buttonHeight or 22)
         btn.lbl:SetText(label)
         btn:SetPoint("CENTER", f, "CENTER", 0, 0)
         btn:SetScript("OnClick", function() if fn then fn() end end)

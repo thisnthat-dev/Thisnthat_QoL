@@ -59,23 +59,11 @@ local defaults = {
             },
             flask = {
                 defaultType = "crit",
-                specOverrides = {
-                    ["581"] = "haste",
-                    ["577"] = "crit",
-                    ["1480"] = "mastery",
-                    ["250"] = "crit",
-                    ["251"] = "crit",
-                    ["252"] = "haste",
-                    ["104"] = "haste",
-                    ["268"] = "crit",
-                },
+                specOverrides = {},
             },
             combatPotion = {
                 defaultType = "lights_potential",
-                specOverrides = {
-                    ["64"] = "recklessness",
-                    ["1480"] = "recklessness",
-                },
+                specOverrides = {},
             },
             iconWidth = 36,
             iconHeight = 36,
@@ -179,6 +167,9 @@ local mplusRewardsMediaDefaults = {
     borderColor = { r = 0.31, g = 0.30, b = 0.30, a = 0.85 },
 }
 
+local PROFILE_EXPORT_PREFIX_V1 = "TNTQOL_PROFILE_V1:"
+local PROFILE_EXPORT_PREFIX_V2 = "TNTQOL_PROFILE_V2:"
+
 local function DeepCopyTable(src)
     if type(src) ~= "table" then
         return src
@@ -190,6 +181,10 @@ local function DeepCopyTable(src)
     end
 
     return out
+end
+
+local function Trim(value)
+    return (tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
 local function MergeDefaults(target, source)
@@ -334,9 +329,126 @@ function Addon:IsModuleEnabled(name)
     return true
 end
 
-local function EnsureDatabase()
+local function EnsureRootDatabase()
     ThisnthatDB = type(ThisnthatDB) == "table" and ThisnthatDB or {}
     return ThisnthatDB
+end
+
+local function GetLibDeflate()
+    if type(LibStub) == "table" and type(LibStub.GetLibrary) == "function" then
+        local lib = LibStub("LibDeflate", true)
+        if type(lib) == "table" then
+            return lib
+        end
+    end
+
+    local globalLib = rawget(_G, "LibDeflate")
+    if type(globalLib) == "table" then
+        return globalLib
+    end
+
+    return nil
+end
+
+local function IsIdentifierKey(key)
+    return type(key) == "string" and string.match(key, "^[_%a][_%w]*$") ~= nil
+end
+
+local function SerializeValue(value, seen)
+    local valueType = type(value)
+    if valueType == "nil" then
+        return "nil"
+    end
+    if valueType == "boolean" then
+        return value and "true" or "false"
+    end
+    if valueType == "number" then
+        if value ~= value then
+            return "0"
+        end
+        if value == math.huge then
+            return "1/0"
+        end
+        if value == -math.huge then
+            return "-1/0"
+        end
+        return tostring(value)
+    end
+    if valueType == "string" then
+        return string.format("%q", value)
+    end
+    if valueType ~= "table" then
+        return nil
+    end
+
+    if seen[value] then
+        return nil
+    end
+    seen[value] = true
+
+    local keys = {}
+    for key in pairs(value) do
+        keys[#keys + 1] = key
+    end
+
+    table.sort(keys, function(a, b)
+        if type(a) == type(b) and (type(a) == "number" or type(a) == "string") then
+            return a < b
+        end
+        return tostring(a) < tostring(b)
+    end)
+
+    local parts = {}
+    for _, key in ipairs(keys) do
+        local serializedValue = SerializeValue(value[key], seen)
+        local serializedKey = SerializeValue(key, seen)
+        if serializedValue and serializedKey then
+            local keyPart = IsIdentifierKey(key) and key or ("[" .. serializedKey .. "]")
+            parts[#parts + 1] = keyPart .. "=" .. serializedValue
+        end
+    end
+
+    seen[value] = nil
+    return "{" .. table.concat(parts, ",") .. "}"
+end
+
+local function SerializeTable(value)
+    if type(value) ~= "table" then
+        return nil
+    end
+    return SerializeValue(value, {})
+end
+
+local function DeserializeTable(serializedText)
+    local text = Trim(serializedText)
+    if text == "" then
+        return nil, "Import text is empty"
+    end
+
+    local loader = rawget(_G, "loadstring") or rawget(_G, "load")
+    if type(loader) ~= "function" then
+        return nil, "Lua loader is unavailable"
+    end
+
+    local chunk, loadErr = loader("return " .. text)
+    if not chunk then
+        return nil, tostring(loadErr or "Invalid profile payload")
+    end
+
+    local setEnv = rawget(_G, "setfenv")
+    if type(setEnv) == "function" then
+        setEnv(chunk, {})
+    end
+
+    local ok, result = pcall(chunk)
+    if not ok then
+        return nil, tostring(result)
+    end
+    if type(result) ~= "table" then
+        return nil, "Profile payload must decode to a table"
+    end
+
+    return result
 end
 
 local function IsAddOnLoadedByName(addOnName)
@@ -352,20 +464,490 @@ local function IsAddOnLoadedByName(addOnName)
     return false
 end
 
-function Addon:InitializeDatabase()
-    self.db = EnsureDatabase()
-    MergeDefaults(self.db, defaults)
-    PruneDeprecatedSettings(self.db)
+function Addon:GetDefaultProfileTemplate()
+    return DeepCopyTable(defaults)
+end
 
-    self.db.modules = type(self.db.modules) == "table" and self.db.modules or {}
-    self.db.modules.ElvUI = type(self.db.modules.ElvUI) == "table" and self.db.modules.ElvUI or {}
-    if self.db.modules.ElvUI.enabled == nil then
-        self.db.modules.ElvUI.enabled = IsAddOnLoadedByName("ElvUI")
+function Addon:NormalizeProfile(profile)
+    if type(profile) ~= "table" then
+        return
+    end
+
+    MergeDefaults(profile, defaults)
+    PruneDeprecatedSettings(profile)
+
+    profile.modules = type(profile.modules) == "table" and profile.modules or {}
+    profile.modules.ElvUI = type(profile.modules.ElvUI) == "table" and profile.modules.ElvUI or {}
+    if profile.modules.ElvUI.enabled == nil then
+        profile.modules.ElvUI.enabled = IsAddOnLoadedByName("ElvUI")
     end
 end
 
+function Addon:GetProfileNames()
+    local root = self.rootDB or EnsureRootDatabase()
+    root.profiles = type(root.profiles) == "table" and root.profiles or {}
+
+    local names = {}
+    for name, profile in pairs(root.profiles) do
+        if type(name) == "string" and type(profile) == "table" then
+            names[#names + 1] = name
+        end
+    end
+
+    table.sort(names)
+    return names
+end
+
+function Addon:GetUniqueProfileName(baseName)
+    local root = self.rootDB or EnsureRootDatabase()
+    root.profiles = type(root.profiles) == "table" and root.profiles or {}
+
+    local base = Trim(baseName)
+    if base == "" then
+        base = "Imported"
+    end
+
+    if type(root.profiles[base]) ~= "table" then
+        return base
+    end
+
+    local index = 2
+    while true do
+        local candidate = string.format("%s (%d)", base, index)
+        if type(root.profiles[candidate]) ~= "table" then
+            return candidate
+        end
+        index = index + 1
+    end
+end
+
+function Addon:GetActiveProfileName()
+    local root = self.rootDB or EnsureRootDatabase()
+    return type(root.activeProfile) == "string" and root.activeProfile or "Default"
+end
+
+function Addon:GetActiveProfileTable()
+    if type(self.db) == "table" then
+        return self.db
+    end
+
+    self:InitializeDatabase()
+    return self.db
+end
+
+function Addon:ApplyProfile()
+    for name, module in pairs(self.modules) do
+        local enabled = self:IsModuleEnabled(name)
+
+        if enabled then
+            if not module._tntInitialized and type(module.OnInitialize) == "function" then
+                local okInit, errInit = pcall(module.OnInitialize, module, self)
+                if okInit then
+                    module._tntInitialized = true
+                else
+                    self:Print("Failed to initialize module '" .. name .. "': " .. tostring(errInit))
+                end
+            end
+
+            if not module._tntEnabled and type(module.OnEnable) == "function" then
+                local okEnable, errEnable = pcall(module.OnEnable, module, self)
+                if okEnable then
+                    module._tntEnabled = true
+                else
+                    self:Print("Failed to enable module '" .. name .. "': " .. tostring(errEnable))
+                end
+            end
+
+            if type(module.Refresh) == "function" then
+                local okRefresh, errRefresh = pcall(module.Refresh, module)
+                if not okRefresh then
+                    self:Print("Failed to refresh module '" .. name .. "': " .. tostring(errRefresh))
+                end
+            end
+        else
+            if module.frame and type(module.frame.Hide) == "function" then
+                module.frame:Hide()
+            end
+            if type(module.RefreshVisibility) == "function" then
+                pcall(module.RefreshVisibility, module)
+            end
+        end
+    end
+
+    if ns.OptionsFrame and type(ns.OptionsFrame.ApplyCurrentAccent) == "function" then
+        ns.OptionsFrame:ApplyCurrentAccent()
+    end
+    if ns.OptionsFrame and type(ns.OptionsFrame.ApplyCurrentFont) == "function" then
+        ns.OptionsFrame:ApplyCurrentFont()
+    end
+    if type(ns.RefreshCurrentPage) == "function" then
+        ns.RefreshCurrentPage()
+    end
+end
+
+function Addon:SetActiveProfile(profileName)
+    local root = self.rootDB or EnsureRootDatabase()
+    root.profiles = type(root.profiles) == "table" and root.profiles or {}
+
+    local name = Trim(profileName)
+    if name == "" then
+        return false, "Profile name cannot be empty"
+    end
+
+    local profile = root.profiles[name]
+    if type(profile) ~= "table" then
+        return false, "Profile does not exist"
+    end
+
+    root.activeProfile = name
+    self.profileName = name
+    self.db = profile
+    self:NormalizeProfile(self.db)
+    self:ApplyProfile()
+    return true
+end
+
+function Addon:CreateProfile(profileName, selectProfile)
+    local root = self.rootDB or EnsureRootDatabase()
+    root.profiles = type(root.profiles) == "table" and root.profiles or {}
+
+    local name = Trim(profileName)
+    if name == "" then
+        return false, "Profile name cannot be empty"
+    end
+    if type(root.profiles[name]) == "table" then
+        return false, "A profile with that name already exists"
+    end
+
+    root.profiles[name] = self:GetDefaultProfileTemplate()
+    self:NormalizeProfile(root.profiles[name])
+
+    if selectProfile then
+        return self:SetActiveProfile(name)
+    end
+
+    return true, name
+end
+
+function Addon:CloneProfile(newProfileName, sourceProfileName, selectProfile)
+    local root = self.rootDB or EnsureRootDatabase()
+    root.profiles = type(root.profiles) == "table" and root.profiles or {}
+
+    local targetName = Trim(newProfileName)
+    if targetName == "" then
+        return false, "Profile name cannot be empty"
+    end
+    if type(root.profiles[targetName]) == "table" then
+        return false, "A profile with that name already exists"
+    end
+
+    local sourceName = Trim(sourceProfileName)
+    if sourceName == "" then
+        sourceName = self:GetActiveProfileName()
+    end
+
+    local sourceProfile = root.profiles[sourceName]
+    if type(sourceProfile) ~= "table" then
+        return false, "Source profile does not exist"
+    end
+
+    root.profiles[targetName] = DeepCopyTable(sourceProfile)
+    self:NormalizeProfile(root.profiles[targetName])
+
+    if selectProfile then
+        return self:SetActiveProfile(targetName)
+    end
+
+    return true, targetName
+end
+
+function Addon:ResetProfile(profileName, selectProfile)
+    local root = self.rootDB or EnsureRootDatabase()
+    root.profiles = type(root.profiles) == "table" and root.profiles or {}
+
+    local name = Trim(profileName)
+    if name == "" then
+        name = self:GetActiveProfileName()
+    end
+    if type(root.profiles[name]) ~= "table" then
+        return false, "Profile does not exist"
+    end
+
+    root.profiles[name] = self:GetDefaultProfileTemplate()
+    self:NormalizeProfile(root.profiles[name])
+
+    if selectProfile then
+        local ok, err = self:SetActiveProfile(name)
+        if not ok then
+            return false, err
+        end
+    elseif self:GetActiveProfileName() == name then
+        self.db = root.profiles[name]
+        self:ApplyProfile()
+    end
+
+    return true, name
+end
+
+function Addon:DeleteProfile(profileName)
+    local root = self.rootDB or EnsureRootDatabase()
+    root.profiles = type(root.profiles) == "table" and root.profiles or {}
+
+    local name = Trim(profileName)
+    if name == "" then
+        return false, "Profile name cannot be empty"
+    end
+    if type(root.profiles[name]) ~= "table" then
+        return false, "Profile does not exist"
+    end
+
+    local activeName = self:GetActiveProfileName()
+    if activeName == name then
+        return false, "Cannot delete the active profile. Switch profiles first."
+    end
+
+    root.profiles[name] = nil
+
+    if next(root.profiles) == nil then
+        root.profiles.Default = self:GetDefaultProfileTemplate()
+        self:NormalizeProfile(root.profiles.Default)
+        root.activeProfile = "Default"
+        self.profileName = "Default"
+        self.db = root.profiles.Default
+        self:ApplyProfile()
+    end
+
+    return true
+end
+
+function Addon:ExportProfile(profileName)
+    local root = self.rootDB or EnsureRootDatabase()
+    root.profiles = type(root.profiles) == "table" and root.profiles or {}
+
+    local name = Trim(profileName)
+    if name == "" then
+        name = self:GetActiveProfileName()
+    end
+
+    local profile = root.profiles[name]
+    if type(profile) ~= "table" then
+        return false, "Profile does not exist"
+    end
+
+    local payload = {
+        version = 1,
+        name = name,
+        data = DeepCopyTable(profile),
+    }
+    local serialized = SerializeTable(payload)
+    if not serialized then
+        return false, "Could not serialize profile"
+    end
+
+    local libDeflate = GetLibDeflate()
+    if not libDeflate then
+        return true, PROFILE_EXPORT_PREFIX_V1 .. serialized
+    end
+
+    local compressed = libDeflate:CompressDeflate(serialized, { level = 9 })
+    if type(compressed) ~= "string" or compressed == "" then
+        return false, "Could not compress profile payload"
+    end
+
+    local encoded = libDeflate:EncodeForPrint(compressed)
+    if type(encoded) ~= "string" or encoded == "" then
+        return false, "Could not encode compressed profile payload"
+    end
+
+    return true, PROFILE_EXPORT_PREFIX_V2 .. encoded
+end
+
+local function DecodeImportPayload(serializedText)
+    local text = Trim(serializedText)
+    local decodedText = nil
+
+    if string.sub(text, 1, #PROFILE_EXPORT_PREFIX_V2) == PROFILE_EXPORT_PREFIX_V2 then
+        local libDeflate = GetLibDeflate()
+        if not libDeflate then
+            return nil, "LibDeflate is required to import compressed profile strings"
+        end
+
+        local encoded = string.sub(text, #PROFILE_EXPORT_PREFIX_V2 + 1)
+        local compressed = libDeflate:DecodeForPrint(encoded)
+        if type(compressed) ~= "string" then
+            return nil, "Compressed profile text is invalid"
+        end
+
+        decodedText = libDeflate:DecompressDeflate(compressed)
+        if type(decodedText) ~= "string" or decodedText == "" then
+            return nil, "Could not decompress profile payload"
+        end
+    else
+        decodedText = text
+        if string.sub(decodedText, 1, #PROFILE_EXPORT_PREFIX_V1) == PROFILE_EXPORT_PREFIX_V1 then
+            decodedText = string.sub(decodedText, #PROFILE_EXPORT_PREFIX_V1 + 1)
+        end
+    end
+
+    local decoded, decodeErr = DeserializeTable(decodedText)
+    if type(decoded) ~= "table" then
+        return nil, decodeErr or "Invalid profile data"
+    end
+
+    return decoded
+end
+
+function Addon:InspectImportProfile(serializedText)
+    local decoded, decodeErr = DecodeImportPayload(serializedText)
+    if type(decoded) ~= "table" then
+        return false, decodeErr or "Invalid profile data"
+    end
+
+    local incomingData = type(decoded.data) == "table" and decoded.data or decoded
+    if type(incomingData) ~= "table" then
+        return false, "Profile payload must decode to a table"
+    end
+
+    local incomingName = type(decoded.name) == "string" and Trim(decoded.name) or ""
+    if incomingName == "" then
+        incomingName = "Imported"
+    end
+
+    return true, incomingName
+end
+
+function Addon:ImportProfile(serializedText, requestedName, selectProfile, options)
+    local root = self.rootDB or EnsureRootDatabase()
+    root.profiles = type(root.profiles) == "table" and root.profiles or {}
+
+    local decoded, decodeErr = DecodeImportPayload(serializedText)
+    if type(decoded) ~= "table" then
+        return false, decodeErr or "Invalid profile data"
+    end
+
+    local incomingData = type(decoded.data) == "table" and decoded.data or decoded
+    local incomingName = type(decoded.name) == "string" and decoded.name or nil
+    local name = Trim(requestedName)
+    if name == "" then
+        name = Trim(incomingName)
+    end
+    if name == "" then
+        name = "Imported"
+    end
+
+    local collisionMode = type(options) == "table" and options.collisionMode or "overwrite"
+    local existing = type(root.profiles[name]) == "table"
+    if existing then
+        if collisionMode == "auto_rename" then
+            name = self:GetUniqueProfileName(name)
+        elseif collisionMode == "fail" then
+            return false, "A profile with that name already exists"
+        else
+            collisionMode = "overwrite"
+        end
+    end
+
+    root.profiles[name] = DeepCopyTable(incomingData)
+    self:NormalizeProfile(root.profiles[name])
+
+    if selectProfile then
+        local ok, err = self:SetActiveProfile(name)
+        if not ok then
+            return false, err
+        end
+    end
+
+    return true, name
+end
+
+function Addon:InitializeDatabase()
+    local root = EnsureRootDatabase()
+
+    local needsMigration = type(root.profiles) ~= "table" or next(root.profiles) == nil
+    if needsMigration then
+        local recovered = {}
+        for key, value in pairs(root) do
+            if key ~= "profiles" and key ~= "activeProfile" then
+                recovered[key] = DeepCopyTable(value)
+            end
+        end
+
+        local migratedRoot = {
+            profiles = {
+                Default = self:GetDefaultProfileTemplate(),
+            },
+            activeProfile = "Default",
+        }
+
+        self:NormalizeProfile(migratedRoot.profiles.Default)
+
+        if next(recovered) ~= nil then
+            self:NormalizeProfile(recovered)
+            migratedRoot.profiles.Recovered = recovered
+            migratedRoot.activeProfile = "Recovered"
+        end
+
+        ThisnthatDB = migratedRoot
+        root = migratedRoot
+    end
+
+    root.profiles = type(root.profiles) == "table" and root.profiles or {}
+    if type(root.profiles.Default) ~= "table" then
+        root.profiles.Default = self:GetDefaultProfileTemplate()
+    end
+
+    for key in pairs(root) do
+        if key ~= "profiles" and key ~= "activeProfile" then
+            root[key] = nil
+        end
+    end
+
+    for name, profile in pairs(root.profiles) do
+        if type(name) ~= "string" or type(profile) ~= "table" then
+            root.profiles[name] = nil
+        else
+            self:NormalizeProfile(profile)
+        end
+    end
+
+    if next(root.profiles) == nil then
+        root.profiles.Default = self:GetDefaultProfileTemplate()
+        self:NormalizeProfile(root.profiles.Default)
+    end
+
+    local activeName = type(root.activeProfile) == "string" and root.activeProfile or nil
+    if not activeName or type(root.profiles[activeName]) ~= "table" then
+        if type(root.profiles.Recovered) == "table" then
+            activeName = "Recovered"
+        else
+            activeName = "Default"
+        end
+    end
+
+    root.activeProfile = activeName
+    self.rootDB = root
+    self.profileName = activeName
+    self.db = root.profiles[activeName]
+    self:NormalizeProfile(self.db)
+end
+
+function Addon:GetProfileRoot()
+    self.rootDB = type(self.rootDB) == "table" and self.rootDB or EnsureRootDatabase()
+    self.rootDB.profiles = type(self.rootDB.profiles) == "table" and self.rootDB.profiles or {}
+    return self.rootDB
+end
+
+function Addon:EnsureActiveProfile()
+    if type(self.db) == "table" then
+        return self.db
+    end
+
+    self:InitializeDatabase()
+    return self.db
+end
+
 function Addon:GetGlobalMediaConfig()
-    self.db = type(self.db) == "table" and self.db or EnsureDatabase()
+    self.db = type(self.db) == "table" and self.db or self:EnsureActiveProfile()
     self.db.globalMedia = type(self.db.globalMedia) == "table" and self.db.globalMedia or {}
     local cfg = self.db.globalMedia
 
@@ -384,7 +966,7 @@ function Addon:GetGlobalMediaConfig()
 end
 
 function Addon:GetModuleMediaConfig(moduleName)
-    self.db = type(self.db) == "table" and self.db or EnsureDatabase()
+    self.db = type(self.db) == "table" and self.db or self:EnsureActiveProfile()
     self.db.moduleMedia = type(self.db.moduleMedia) == "table" and self.db.moduleMedia or {}
     self.db.moduleMedia[moduleName] = type(self.db.moduleMedia[moduleName]) == "table" and self.db.moduleMedia[moduleName] or {}
 
@@ -459,6 +1041,8 @@ function Addon:InitializeModules()
             local ok, err = pcall(module.OnInitialize, module, self)
             if not ok then
                 self:Print("Failed to initialize module '" .. name .. "': " .. tostring(err))
+            else
+                module._tntInitialized = true
             end
         end
     end
@@ -470,6 +1054,8 @@ function Addon:EnableModules()
             local ok, err = pcall(module.OnEnable, module, self)
             if not ok then
                 self:Print("Failed to enable module '" .. name .. "': " .. tostring(err))
+            else
+                module._tntEnabled = true
             end
         end
     end
