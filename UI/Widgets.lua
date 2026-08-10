@@ -292,18 +292,31 @@ function W.Builder(parent, opts)
         f:SetHeight(30)
         RowBG(f)
 
+        local hasLabel = type(label) == "string" and label ~= ""
+
         local lbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lbl:SetPoint("LEFT", f, "LEFT", 10, 0)
-        lbl:SetPoint("RIGHT", f, "CENTER", -60, 0)
-        lbl:SetText(label)
+        if hasLabel then
+            lbl:SetPoint("LEFT", f, "LEFT", 10, 0)
+            lbl:SetPoint("RIGHT", f, "CENTER", -60, 0)
+            lbl:SetText(label)
+        else
+            lbl:SetText("")
+            lbl:Hide()
+        end
         lbl:SetTextColor(C.WHITE.r, C.WHITE.g, C.WHITE.b, 0.9)
         lbl:SetJustifyH("LEFT")
         lbl:SetWordWrap(false)
         W.ApplyFont(lbl, -1)
 
         local dropdownBtn = CreateFrame("Button", nil, f, "BackdropTemplate")
-        dropdownBtn:SetSize(dropdownWidth or 260, 22)
-        dropdownBtn:SetPoint("RIGHT", f, "RIGHT", -8, 0)
+        if hasLabel then
+            dropdownBtn:SetSize(dropdownWidth or 260, 22)
+            dropdownBtn:SetPoint("RIGHT", f, "RIGHT", -8, 0)
+        else
+            dropdownBtn:SetHeight(22)
+            dropdownBtn:SetPoint("LEFT", f, "LEFT", 8, 0)
+            dropdownBtn:SetPoint("RIGHT", f, "RIGHT", -8, 0)
+        end
         dropdownBtn:SetBackdrop({
             bgFile   = "Interface\\Buttons\\WHITE8X8",
             edgeFile = "Interface\\Buttons\\WHITE8X8",

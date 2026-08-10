@@ -32,6 +32,54 @@ local defaults = {
         Macros = {
             enabled = true,
         },
+        Consumables = {
+            enabled = true,
+            tracking = {
+                healthPotion = true,
+                combatPotion = true,
+                flask = true,
+                oil = true,
+                food = true,
+                feast = true,
+                battleRes = true,
+            },
+            alerts = {
+                healthPotion = { enabled = true, minCount = 5, countSource = "TOTAL" },
+                combatPotion = { enabled = true, minCount = 5, countSource = "TOTAL" },
+                flask = { enabled = true, minCount = 5, countSource = "TOTAL" },
+                oil = { enabled = true, minCount = 5, countSource = "TOTAL" },
+                food = { enabled = true, minCount = 5, countSource = "TOTAL" },
+                feast = { enabled = true, minCount = 5, countSource = "TOTAL" },
+                battleRes = { enabled = true, minCount = 5, countSource = "TOTAL" },
+            },
+            battleRes = {
+                disableIfClassHasSpell = false,
+            },
+            flask = {
+                defaultType = "crit",
+                specOverrides = {
+                    ["581"] = "haste",
+                    ["577"] = "crit",
+                    ["1480"] = "mastery",
+                    ["250"] = "crit",
+                    ["251"] = "crit",
+                    ["252"] = "haste",
+                    ["104"] = "haste",
+                    ["268"] = "crit",
+                },
+            },
+            combatPotion = {
+                defaultType = "lights_potential",
+                specOverrides = {
+                    ["64"] = "recklessness",
+                    ["1480"] = "recklessness",
+                },
+            },
+            iconWidth = 36,
+            iconHeight = 36,
+            iconGap = 4,
+            qualitySize = 12,
+        },
         ElvUI = {},
     },
     databrokers = {

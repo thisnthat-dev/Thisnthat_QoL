@@ -726,6 +726,19 @@ function Module:FindBestCombatPotionForChoice(choiceKey)
     return nil
 end
 
+function Module:GetTopPriorityCombatPotionItemID(choiceKey)
+    if not IsCombatPotionChoice(choiceKey) then
+        return nil
+    end
+
+    local preferredIDs = COMBAT_POTION_ITEM_PRIORITIES[choiceKey]
+    if type(preferredIDs) ~= "table" then
+        return nil
+    end
+
+    return tonumber(preferredIDs[1])
+end
+
 function Module:GetAvailableItemsByID()
     local availableByID = {}
     local maxBag = tonumber(rawget(_G, "NUM_BAG_SLOTS")) or 4
@@ -774,6 +787,20 @@ function Module:GetHealingPotionPriorityOrder(healingCfg)
     end
 
     return order
+end
+
+function Module:GetTopPriorityHealingFallback(healingCfg)
+    local priorityOrder = self:GetHealingPotionPriorityOrder(healingCfg)
+    local fallbackItemID = tonumber(priorityOrder[1])
+    if fallbackItemID then
+        return {
+            sourceType = "item",
+            itemID = fallbackItemID,
+            itemName = C_Item.GetItemInfo(fallbackItemID),
+        }
+    end
+
+    return nil
 end
 
 function Module:SwapDrinkEntries(firstKey, secondKey)
@@ -1088,6 +1115,35 @@ function Module:FindBestFlaskForStat(statKey)
     return best
 end
 
+function Module:GetTopPriorityFlaskItemID(statKey)
+    if not IsFlaskStat(statKey) then
+        return nil
+    end
+
+    local preferredIDs = FLASK_ITEM_PRIORITIES[statKey]
+    if type(preferredIDs) ~= "table" then
+        return nil
+    end
+
+    return tonumber(preferredIDs[1])
+end
+
+function Module:GetTopPriorityDrinkItemID()
+    local drinkCfg = self:GetDrinkConfig()
+
+    for _, entryKey in ipairs(drinkCfg.order) do
+        local itemIDs = DRINK_ENTRY_ITEM_IDS[entryKey]
+        if type(itemIDs) == "table" then
+            local itemID = tonumber(itemIDs[1])
+            if itemID then
+                return itemID, entryKey
+            end
+        end
+    end
+
+    return nil, nil
+end
+
 function Module:BuildFlaskMacroText()
     local statKey = self:GetEffectiveFlaskStatForPlayer()
     local statLabel = FLASK_STAT_LABELS[statKey] or statKey
@@ -1099,6 +1155,15 @@ function Module:BuildFlaskMacroText()
             "/use item:" .. tostring(chosen.itemID),
         }
         return table.concat(lines, "\n"), chosen, statLabel
+    end
+
+    local fallbackItemID = self:GetTopPriorityFlaskItemID(statKey)
+    if fallbackItemID then
+        local lines = {
+            "#showtooltip item:" .. tostring(fallbackItemID),
+            "/use item:" .. tostring(fallbackItemID),
+        }
+        return table.concat(lines, "\n"), nil, statLabel
     end
 
     local lines = {
@@ -1132,6 +1197,15 @@ function Module:BuildCombatPotionMacroText()
         return table.concat(lines, "\n"), chosen, choiceLabel
     end
 
+    local fallbackItemID = self:GetTopPriorityCombatPotionItemID(choiceKey)
+    if fallbackItemID then
+        local lines = {
+            "#showtooltip item:" .. tostring(fallbackItemID),
+            "/use item:" .. tostring(fallbackItemID),
+        }
+        return table.concat(lines, "\n"), nil, choiceLabel
+    end
+
     local lines = {
         "#showtooltip",
         "/run UIErrorsFrame:AddMessage(\"TNT Combat Potion: No " .. choiceLabel .. " potion found in bags.\", 1, 0.2, 0.2, 1)",
@@ -1153,11 +1227,17 @@ end
 function Module:BuildHealingPotionMacroText()
     local healingCfg = self:GetHealingPotionConfig()
     local chosen, allOnCooldown = self:PickHealingItem()
+    local fallback = nil
+    if not chosen then
+        fallback = self:GetTopPriorityHealingFallback(healingCfg)
+        chosen = fallback
+    end
 
     local lines = {}
 
     if chosen and chosen.sourceType == "spell" and chosen.spellID then
-        lines[#lines + 1] = "#showtooltip spell:" .. tostring(chosen.spellID)
+        local spellName = chosen.displayName or GetSpellDisplayName(chosen.spellID, "Recuperate")
+        lines[#lines + 1] = "#showtooltip " .. tostring(spellName)
     elseif chosen and chosen.itemID then
         lines[#lines + 1] = "#showtooltip item:" .. tostring(chosen.itemID)
     else
@@ -1230,6 +1310,15 @@ function Module:BuildDrinkMacroText()
             "/use item:" .. tostring(chosen.itemID),
         }
         return table.concat(lines, "\n"), chosen, entryKey
+    end
+
+    local fallbackItemID, fallbackEntryKey = self:GetTopPriorityDrinkItemID()
+    if fallbackItemID then
+        local lines = {
+            "#showtooltip item:" .. tostring(fallbackItemID),
+            "/use item:" .. tostring(fallbackItemID),
+        }
+        return table.concat(lines, "\n"), nil, fallbackEntryKey
     end
 
     local lines = {

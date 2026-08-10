@@ -2,7 +2,7 @@
 ## Title: Thisnthat QoL
 ## Notes: Modular quality-of-life addon with integrated options.
 ## Author: Thisnthat
-## Version: 1.3.3
+## Version: 1.3.4
 ## SavedVariables: ThisnthatDB
 ## OptionalDeps: Thisnthat_SharedMedia, Thisnthat_Databrokers, Thisnthat_KickAssist, ElvUI, EllesmereUIResourceBars, LibSharedMedia-3.0, LibDataBroker-1.1, Ace3, Blizzard_UIDropDownMenu
 
@@ -18,6 +18,7 @@ Modules\EllesmereUIAbsorb\EllesmereUIAbsorb.lua
 Modules\PerformanceSettings\PerformanceSettings.lua
 Modules\MPlusRewards\MPlusRewards.lua
 Modules\Macros\Macros.lua
+Modules\Consumables\Consumables.lua
 Modules\ElvUI\ElvUI.lua
 Bootstrap.lua
 UI\OptionsFrame.lua
@@ -30,6 +31,7 @@ Pages\PageEllesmereUIAbsorb.lua
 Pages\PagePerformance.lua
 Pages\PageMPlusRewards.lua
 Pages\PageMacros.lua
+Pages\PageConsumables.lua
 Pages\PageKickAssist.lua
 Pages\PageElvUI.lua
 Options.lua

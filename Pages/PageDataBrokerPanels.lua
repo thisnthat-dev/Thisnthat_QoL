@@ -890,7 +890,7 @@ function ns:InitDataBrokerPanelsPage()
             end, true)
             AddSubPanel("databrokers", "DataBrokers", function(b)
                 for slot = 1, selectedCfg.maxBrokers do
-                    b:Cycle("DataBroker " .. tostring(slot),
+                    b:Cycle("",
                         function() return brokerItems end,
                         function() return selectedCfg.brokers[slot] or "" end,
                         function(v)

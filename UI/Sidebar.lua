@@ -286,6 +286,8 @@ local moduleEntries = {
             onClick = function() if ns.InitPerformancePage then ns:InitPerformancePage() end end },
         { key = "MPlusRewards", label = "M+ Rewards",
             onClick = function() if ns.InitMPlusRewardsPage then ns:InitMPlusRewardsPage() end end },
+        { key = "Consumables", label = "Consumables",
+            onClick = function() if ns.InitConsumablesPage then ns:InitConsumablesPage() end end },
         { key = "ElvUI", label = "ElvUI",
             onClick = function() if ns.InitElvUIPage then ns:InitElvUIPage() end end },
 }
