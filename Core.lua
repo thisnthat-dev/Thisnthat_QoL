@@ -125,7 +125,8 @@ local defaults = {
             enableHealthstones = true,
             enableHealingPotions = true,
             addStopCast = false,
-            prioritizeHealingPotions = false,
+            warlockSeparateMacros = false,
+            warlockHealthstoneMacroName = "TNT: Healthstone",
         },
         combatPotion = {
             enabled = true,

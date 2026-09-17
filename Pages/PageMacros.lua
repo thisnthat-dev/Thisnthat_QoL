@@ -296,14 +296,6 @@ function ns:InitMacrosPage()
                 module:SetHealingPotionEnabled(value and true or false)
             end)
 
-        builder:Toggle("Use Soulburn for Healthstone on Warlock",
-            function()
-                return healingCfg.useSoulburnForHealthstone and true or false
-            end,
-            function(value)
-                module:SetHealingUseSoulburn(value)
-            end)
-
         builder:Toggle("Use Recuperate out of combat",
             function()
                 return healingCfg.useRecuperateOutOfCombat and true or false
@@ -336,14 +328,6 @@ function ns:InitMacrosPage()
                 module:SetHealingAddStopCast(value)
             end)
 
-        builder:Toggle("|cffff4d4dPrioritize Healing Potions over Healthstones|r",
-            function()
-                return healingCfg.prioritizeHealingPotions and true or false
-            end,
-            function(value)
-                module:SetHealingPrioritizePotions(value)
-            end)
-
         builder:Desc("When enabled, the macro is auto-created (if missing) and kept updated automatically.")
 
         local preview = module:GetHealingPotionMacroPreview()
@@ -355,6 +339,33 @@ function ns:InitMacrosPage()
             end
         else
             builder:Desc("Current selection: no enabled healing items found in bags")
+        end
+
+        builder:Header("Warlock Options")
+
+        builder:Toggle("Create separate Healthstone and Healing Potion macros",
+            function()
+                return healingCfg.warlockSeparateMacros and true or false
+            end,
+            function(value)
+                module:SetWarlockSeparateMacros(value)
+            end)
+
+        builder:Toggle("Use Soulburn in Healthstone macro",
+            function()
+                return healingCfg.useSoulburnForHealthstone and true or false
+            end,
+            function(value)
+                module:SetHealingUseSoulburn(value)
+            end)
+
+        builder:Desc("Soulburn only applies when separate macros are created. On Warlocks, the Healthstone item automatically switches to the Demonic Healthstone if Pact of Gluttony is selected; the combined macro instead uses a cast sequence that resets every 60 seconds with Pact of Gluttony, or on leaving combat without it.")
+
+        if healingCfg.warlockSeparateMacros then
+            local warlockPreview = module:GetWarlockHealthstoneMacroPreview()
+            if warlockPreview.chosenItemName then
+                builder:Desc("Healthstone macro selection: " .. tostring(warlockPreview.chosenItemName))
+            end
         end
     end, false)
 

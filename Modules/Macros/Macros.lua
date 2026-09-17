@@ -9,6 +9,8 @@ local Module = {
     pendingCombatPotionCreate = false,
     pendingHealingPotionUpdate = false,
     pendingHealingPotionCreate = false,
+    pendingWarlockHealthstoneUpdate = false,
+    pendingWarlockHealthstoneCreate = false,
     healingCooldownTicker = nil,
     pendingDrinkUpdate = false,
     pendingDrinkCreate = false,
@@ -80,15 +82,12 @@ local COMBAT_POTION_ITEM_TO_CHOICE = {
 
 local SOULBURN_SPELL_ID = 385899
 local RECUPERATE_SPELL_ID = 1231411
+local PACT_OF_GLUTTONY_SPELL_ID = 386689
 local DEMONIC_HEALTHSTONE_ITEM_ID = 224464
 local HEALTHSTONE_ITEM_ID = 5512
 
 local HEALING_POTION_ITEM_PRIORITIES = { 271884, 271883, 241304, 241305 }
 local HEALTHSTONE_ITEM_PRIORITIES = { DEMONIC_HEALTHSTONE_ITEM_ID, HEALTHSTONE_ITEM_ID }
-local HEALTHSTONE_ITEM_LOOKUP = {
-    [DEMONIC_HEALTHSTONE_ITEM_ID] = true,
-    [HEALTHSTONE_ITEM_ID] = true,
-}
 
 local DRINK_ENTRY_ORDER = { "TEA", "MAGE_FOOD", "WATER" }
 local DRINK_ENTRY_LABELS = {
@@ -291,7 +290,8 @@ function Module:GetConfig()
     cfg.healingPotion.enableHealthstones = cfg.healingPotion.enableHealthstones ~= false
     cfg.healingPotion.enableHealingPotions = cfg.healingPotion.enableHealingPotions ~= false
     cfg.healingPotion.addStopCast = cfg.healingPotion.addStopCast and true or false
-    cfg.healingPotion.prioritizeHealingPotions = cfg.healingPotion.prioritizeHealingPotions and true or false
+    cfg.healingPotion.warlockSeparateMacros = cfg.healingPotion.warlockSeparateMacros and true or false
+    cfg.healingPotion.warlockHealthstoneMacroName = type(cfg.healingPotion.warlockHealthstoneMacroName) == "string" and cfg.healingPotion.warlockHealthstoneMacroName ~= "" and cfg.healingPotion.warlockHealthstoneMacroName or "TNT: Healthstone"
 
     cfg.combatPotion = type(cfg.combatPotion) == "table" and cfg.combatPotion or {}
     cfg.combatPotion.macroName = type(cfg.combatPotion.macroName) == "string" and cfg.combatPotion.macroName ~= "" and cfg.combatPotion.macroName or "TNT: Combat Potion"
@@ -411,6 +411,29 @@ end
 local function IsPlayerWarlock()
     local _, classTag = UnitClass("player")
     return classTag == "WARLOCK"
+end
+
+local function GetHealthstonePriorityList()
+    if IsPlayerWarlock() then
+        return HEALTHSTONE_ITEM_PRIORITIES
+    end
+
+    return { HEALTHSTONE_ITEM_ID }
+end
+
+local function PlayerKnowsPactOfGluttony()
+    if type(C_SpellBook.IsSpellKnown) ~= "function" then
+        return false
+    end
+    return C_SpellBook.IsSpellKnown(PACT_OF_GLUTTONY_SPELL_ID) and true or false
+end
+
+local function GetWarlockHealthstoneItemID()
+    if PlayerKnowsPactOfGluttony() then
+        return DEMONIC_HEALTHSTONE_ITEM_ID
+    end
+
+    return HEALTHSTONE_ITEM_ID
 end
 
 local function PlayerKnowsSoulburn()
@@ -675,6 +698,9 @@ function Module:GetMacroInfoByKey(macroKey)
     if macroKey == "healingPotion" then
         return cfg.healingPotion.macroName, "Healing Potion"
     end
+    if macroKey == "warlockHealthstone" then
+        return cfg.healingPotion.warlockHealthstoneMacroName, "Healthstone"
+    end
     if macroKey == "combatPotion" then
         return cfg.combatPotion.macroName, "Combat Potion"
     end
@@ -762,7 +788,6 @@ end
 
 function Module:GetHealingPotionPriorityOrder(healingCfg)
     local order = {}
-    local prioritizePotions = healingCfg and healingCfg.prioritizeHealingPotions
 
     local function AppendIDs(source)
         for _, itemID in ipairs(source) do
@@ -770,23 +795,24 @@ function Module:GetHealingPotionPriorityOrder(healingCfg)
         end
     end
 
-    if prioritizePotions then
-        if healingCfg.enableHealingPotions ~= false then
-            AppendIDs(HEALING_POTION_ITEM_PRIORITIES)
-        end
-        if healingCfg.enableHealthstones ~= false then
-            AppendIDs(HEALTHSTONE_ITEM_PRIORITIES)
-        end
-    else
-        if healingCfg.enableHealthstones ~= false then
-            AppendIDs(HEALTHSTONE_ITEM_PRIORITIES)
-        end
-        if healingCfg.enableHealingPotions ~= false then
-            AppendIDs(HEALING_POTION_ITEM_PRIORITIES)
-        end
+    if healingCfg.enableHealthstones ~= false then
+        AppendIDs(GetHealthstonePriorityList())
+    end
+    if healingCfg.enableHealingPotions ~= false then
+        AppendIDs(HEALING_POTION_ITEM_PRIORITIES)
     end
 
     return order
+end
+
+function Module:GetBestAvailableItemID(itemIDList, availableByID)
+    for _, itemID in ipairs(itemIDList) do
+        if availableByID[itemID] then
+            return itemID
+        end
+    end
+
+    return nil
 end
 
 function Module:GetTopPriorityHealingFallback(healingCfg)
@@ -830,16 +856,6 @@ end
 
 function Module:GetHealingCandidates(healingCfg)
     local candidates = {}
-    local outOfCombat = not (InCombatLockdown and InCombatLockdown())
-
-    if healingCfg.useRecuperateOutOfCombat and outOfCombat and PlayerKnowsSpell(RECUPERATE_SPELL_ID) then
-        local spellName = GetSpellDisplayName(RECUPERATE_SPELL_ID, "Recuperate")
-        candidates[#candidates + 1] = {
-            sourceType = "spell",
-            spellID = RECUPERATE_SPELL_ID,
-            displayName = spellName,
-        }
-    end
 
     local priorityOrder = self:GetHealingPotionPriorityOrder(healingCfg)
     local availableByID = self:GetAvailableItemsByID()
@@ -1224,8 +1240,123 @@ function Module:GetCombatPotionMacroPreview()
     }
 end
 
+function Module:GetRecuperateCastLine(healingCfg)
+    if not healingCfg.useRecuperateOutOfCombat or not PlayerKnowsSpell(RECUPERATE_SPELL_ID) then
+        return nil
+    end
+
+    local spellName = GetSpellDisplayName(RECUPERATE_SPELL_ID, "Recuperate")
+    return "/cast [nocombat] " .. tostring(spellName)
+end
+
+function Module:BuildHealingCastSequenceMacroText(healingCfg, resetValue, healthstoneItemID, potionItemID)
+    local lines = { "#showtooltip" }
+
+    if healingCfg.addStopCast then
+        lines[#lines + 1] = "/stopcasting"
+    end
+
+    local recuperateLine = self:GetRecuperateCastLine(healingCfg)
+    if recuperateLine then
+        lines[#lines + 1] = recuperateLine
+    end
+
+    lines[#lines + 1] = "/castsequence reset=" .. tostring(resetValue) .. " item:" .. tostring(healthstoneItemID) .. ", item:" .. tostring(potionItemID)
+
+    local chosen = {
+        sourceType = "castsequence",
+        itemID = healthstoneItemID,
+        secondItemID = potionItemID,
+        itemName = C_Item.GetItemInfo(healthstoneItemID),
+        secondItemName = C_Item.GetItemInfo(potionItemID),
+    }
+
+    return table.concat(lines, "\n"), chosen, false
+end
+
+function Module:BuildWarlockHealthstoneMacroText(healingCfg)
+    local healthstoneItemID = GetWarlockHealthstoneItemID()
+    local lines = { "#showtooltip" }
+
+    if healingCfg.addStopCast then
+        lines[#lines + 1] = "/stopcasting"
+    end
+
+    if healingCfg.useSoulburnForHealthstone and PlayerKnowsSoulburn() then
+        lines[#lines + 1] = "/cast Soulburn"
+    end
+
+    lines[#lines + 1] = "/use item:" .. tostring(healthstoneItemID)
+
+    local chosen = {
+        sourceType = "item",
+        itemID = healthstoneItemID,
+        itemName = C_Item.GetItemInfo(healthstoneItemID),
+    }
+
+    return table.concat(lines, "\n"), chosen
+end
+
+function Module:BuildWarlockHealingPotionOnlyMacroText(healingCfg)
+    local availableByID = self:GetAvailableItemsByID()
+    local potionItemID = self:GetBestAvailableItemID(HEALING_POTION_ITEM_PRIORITIES, availableByID)
+
+    local lines = { "#showtooltip" }
+
+    if healingCfg.addStopCast then
+        lines[#lines + 1] = "/stopcasting"
+    end
+
+    local recuperateLine = self:GetRecuperateCastLine(healingCfg)
+    if recuperateLine then
+        lines[#lines + 1] = recuperateLine
+    end
+
+    local chosen = nil
+    if potionItemID then
+        lines[#lines + 1] = "/use item:" .. tostring(potionItemID)
+        chosen = {
+            sourceType = "item",
+            itemID = potionItemID,
+            itemName = C_Item.GetItemInfo(potionItemID),
+        }
+    else
+        lines[#lines + 1] = "/run UIErrorsFrame:AddMessage(\"TNT Healing: No healing potion found in bags.\", 1, 0.2, 0.2, 1)"
+    end
+
+    return table.concat(lines, "\n"), chosen, false
+end
+
 function Module:BuildHealingPotionMacroText()
     local healingCfg = self:GetHealingPotionConfig()
+
+    if IsPlayerWarlock() then
+        if healingCfg.warlockSeparateMacros then
+            return self:BuildWarlockHealingPotionOnlyMacroText(healingCfg)
+        end
+
+        -- Combined mode: cast sequence using the talent-appropriate healthstone, only when both are on hand.
+        if healingCfg.enableHealthstones ~= false and healingCfg.enableHealingPotions ~= false then
+            local availableByID = self:GetAvailableItemsByID()
+            local healthstoneItemID = GetWarlockHealthstoneItemID()
+            local potionItemID = self:GetBestAvailableItemID(HEALING_POTION_ITEM_PRIORITIES, availableByID)
+
+            if availableByID[healthstoneItemID] and potionItemID then
+                local resetValue = PlayerKnowsPactOfGluttony() and "60" or "combat"
+                return self:BuildHealingCastSequenceMacroText(healingCfg, resetValue, healthstoneItemID, potionItemID)
+            end
+        end
+    elseif healingCfg.enableHealthstones ~= false and healingCfg.enableHealingPotions ~= false then
+        -- Both types enabled and both on hand: use a cast sequence so the macro never needs an in-combat edit.
+        local availableByID = self:GetAvailableItemsByID()
+        local healthstoneItemID = self:GetBestAvailableItemID(GetHealthstonePriorityList(), availableByID)
+        local potionItemID = self:GetBestAvailableItemID(HEALING_POTION_ITEM_PRIORITIES, availableByID)
+
+        if healthstoneItemID and potionItemID then
+            return self:BuildHealingCastSequenceMacroText(healingCfg, "combat", healthstoneItemID, potionItemID)
+        end
+    end
+
     local chosen, allOnCooldown = self:PickHealingItem()
     local fallback = nil
     if not chosen then
@@ -1233,28 +1364,18 @@ function Module:BuildHealingPotionMacroText()
         chosen = fallback
     end
 
-    local lines = {}
-
-    if chosen and chosen.sourceType == "spell" and chosen.spellID then
-        local spellName = chosen.displayName or GetSpellDisplayName(chosen.spellID, "Recuperate")
-        lines[#lines + 1] = "#showtooltip " .. tostring(spellName)
-    elseif chosen and chosen.itemID then
-        lines[#lines + 1] = "#showtooltip item:" .. tostring(chosen.itemID)
-    else
-        lines[#lines + 1] = "#showtooltip"
-    end
+    local lines = { "#showtooltip" }
 
     if healingCfg.addStopCast then
         lines[#lines + 1] = "/stopcasting"
     end
 
-    if chosen and chosen.sourceType == "spell" and chosen.spellID then
-        local spellName = chosen.displayName or GetSpellDisplayName(chosen.spellID, "Recuperate")
-        lines[#lines + 1] = "/cast " .. tostring(spellName)
-    elseif chosen and chosen.itemID then
-        if healingCfg.useSoulburnForHealthstone and HEALTHSTONE_ITEM_LOOKUP[tonumber(chosen.itemID) or 0] and IsPlayerWarlock() and PlayerKnowsSoulburn() then
-            lines[#lines + 1] = "/cast Soulburn"
-        end
+    local recuperateLine = self:GetRecuperateCastLine(healingCfg)
+    if recuperateLine then
+        lines[#lines + 1] = recuperateLine
+    end
+
+    if chosen and chosen.itemID then
         lines[#lines + 1] = "/use item:" .. tostring(chosen.itemID)
     else
         lines[#lines + 1] = "/run UIErrorsFrame:AddMessage(\"TNT Healing: No enabled healing items found in bags.\", 1, 0.2, 0.2, 1)"
@@ -1263,12 +1384,22 @@ function Module:BuildHealingPotionMacroText()
     return table.concat(lines, "\n"), chosen, allOnCooldown
 end
 
+function Module:GetWarlockHealthstoneMacroPreview()
+    local healingCfg = self:GetHealingPotionConfig()
+    local macroBody, chosen = self:BuildWarlockHealthstoneMacroText(healingCfg)
+    return {
+        macroBody = macroBody,
+        chosenItemName = chosen and chosen.itemName or nil,
+        chosenItemID = chosen and chosen.itemID or nil,
+    }
+end
+
 function Module:GetHealingPotionMacroPreview()
     local macroBody, chosen, allOnCooldown = self:BuildHealingPotionMacroText()
     local selectedName = nil
     if chosen then
-        if chosen.sourceType == "spell" then
-            selectedName = chosen.displayName or GetSpellDisplayName(chosen.spellID, "Recuperate")
+        if chosen.sourceType == "castsequence" then
+            selectedName = string.format("%s -> %s (cast sequence)", chosen.itemName or "Healthstone", chosen.secondItemName or "Healing Potion")
         else
             selectedName = chosen.itemName
         end
@@ -1442,6 +1573,32 @@ function Module:UpdateHealingPotionMacro(createIfMissing)
     return true
 end
 
+function Module:UpdateWarlockHealthstoneMacro(createIfMissing)
+    local healingCfg = self:GetHealingPotionConfig()
+    if healingCfg.enabled == false or not healingCfg.warlockSeparateMacros or not IsPlayerWarlock() then
+        return false, "disabled"
+    end
+
+    if InCombatLockdown and InCombatLockdown() then
+        self.pendingWarlockHealthstoneUpdate = true
+        self.pendingWarlockHealthstoneCreate = self.pendingWarlockHealthstoneCreate or (createIfMissing and true or false)
+        return false, "in_combat"
+    end
+
+    local macroBody = self:BuildWarlockHealthstoneMacroText(healingCfg)
+    local ok, err = self:EditMacroByName(healingCfg.warlockHealthstoneMacroName, macroBody, createIfMissing)
+    if not ok and err == "missing" then
+        return false, "missing"
+    end
+
+    if not ok then
+        Addon:Print("Healthstone macro update failed: " .. tostring(err))
+        return false, err
+    end
+
+    return true
+end
+
 function Module:UpdateDrinkMacro(createIfMissing)
     local drinkCfg = self:GetDrinkConfig()
     if drinkCfg.enabled == false then
@@ -1510,8 +1667,9 @@ function Module:RequestHealingPotionMacroUpdate(createIfMissing)
     self.pendingHealingPotionUpdate = true
     self.pendingHealingPotionCreate = self.pendingHealingPotionCreate or (createIfMissing and true or false)
 
-    if InCombatLockdown and InCombatLockdown() then
-        return false, "in_combat"
+    if IsPlayerWarlock() and healingCfg.warlockSeparateMacros then
+        self.pendingWarlockHealthstoneUpdate = true
+        self.pendingWarlockHealthstoneCreate = self.pendingWarlockHealthstoneCreate or (createIfMissing and true or false)
     end
 
     return self:FlushPendingUpdates()
@@ -1587,6 +1745,24 @@ function Module:FlushPendingHealingPotionUpdate()
     return ok, err
 end
 
+function Module:FlushPendingWarlockHealthstoneUpdate()
+    if not self.pendingWarlockHealthstoneUpdate then
+        return true
+    end
+
+    local createIfMissing = self.pendingWarlockHealthstoneCreate and true or false
+    self.pendingWarlockHealthstoneUpdate = false
+    self.pendingWarlockHealthstoneCreate = false
+
+    local ok, err = self:UpdateWarlockHealthstoneMacro(createIfMissing)
+    if not ok and err == "in_combat" then
+        self.pendingWarlockHealthstoneUpdate = true
+        self.pendingWarlockHealthstoneCreate = self.pendingWarlockHealthstoneCreate or createIfMissing
+    end
+
+    return ok, err
+end
+
 function Module:FlushPendingDrinkUpdate()
     if not self.pendingDrinkUpdate then
         return true
@@ -1612,12 +1788,15 @@ function Module:FlushPendingUpdates()
     local errCombat
     local okHealing = true
     local errHealing
+    local okWarlockHealthstone = true
+    local errWarlockHealthstone
     local okDrink = true
     local errDrink
 
     okFlask, errFlask = self:FlushPendingFlaskUpdate()
     okCombat, errCombat = self:FlushPendingCombatPotionUpdate()
     okHealing, errHealing = self:FlushPendingHealingPotionUpdate()
+    okWarlockHealthstone, errWarlockHealthstone = self:FlushPendingWarlockHealthstoneUpdate()
     okDrink, errDrink = self:FlushPendingDrinkUpdate()
 
     if not okFlask then
@@ -1630,6 +1809,10 @@ function Module:FlushPendingUpdates()
 
     if not okHealing then
         return false, errHealing
+    end
+
+    if not okWarlockHealthstone then
+        return false, errWarlockHealthstone
     end
 
     if not okDrink then
@@ -1699,10 +1882,10 @@ function Module:SetHealingAddStopCast(value)
     self:RequestHealingPotionMacroUpdate(false)
 end
 
-function Module:SetHealingPrioritizePotions(value)
+function Module:SetWarlockSeparateMacros(value)
     local healingCfg = self:GetHealingPotionConfig()
-    healingCfg.prioritizeHealingPotions = value and true or false
-    self:RequestHealingPotionMacroUpdate(false)
+    healingCfg.warlockSeparateMacros = value and true or false
+    self:RequestHealingPotionMacroUpdate(true)
 end
 
 function Module:SetDrinkEnabled(enabled)
@@ -1763,7 +1946,10 @@ function Module:HandleEvent(event, ...)
         self:RequestHealingPotionMacroUpdate(false)
     elseif event == "PLAYER_REGEN_ENABLED" then
         self:RequestHealingPotionMacroUpdate(false)
-        self:FlushPendingUpdates()
+        self:FlushPendingUpdates()    
+    elseif event == "PLAYER_LEAVE_COMBAT" or event == "PLAYER_ENTER_COMBAT" then
+        self:RequestHealingPotionMacroUpdate(false)
+        self:FlushPendingUpdates()    
     end
 end
 
@@ -1787,6 +1973,8 @@ function Module:OnEnable()
     self.frame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
     self.frame:RegisterEvent("PLAYER_REGEN_DISABLED")
     self.frame:RegisterEvent("PLAYER_REGEN_ENABLED")
+    self.frame:RegisterEvent("PLAYER_ENTER_COMBAT")
+    self.frame:RegisterEvent("PLAYER_LEAVE_COMBAT")
 
     if cfg and cfg.flask and cfg.flask.enabled ~= false then
         self:RequestFlaskMacroUpdate(true)
